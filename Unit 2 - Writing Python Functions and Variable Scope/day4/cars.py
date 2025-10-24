@@ -158,7 +158,6 @@ def format_observation_row(obsnum):
     # Returns: str (a nicely formatted line of data)
     obs = get_observation(observations, obsnum)
     print(f"{obsnum:<6}| {get_observation_time(obs):<6}| {get_observation_cars(obs):<4}| {get_observation_pedestrians(obs):<5}| {get_observation_bikes(obs):<6}| {get_observation_type(obs):<13}| {get_observation_notes(obs):<13}") # replace print with your code
-    print_line()
 
 def print_table_header():
     # Prints the header section for the table of observations.
@@ -166,13 +165,14 @@ def print_table_header():
     print("INTERSECTION OBSERVATIONS")
     print_line()
     print (f"Obs # | {"Time":<6}| {"Cars":<4}| {"Peds":<5}| {"Bikes":<6}| {"Type":<13}| Notes")
+    print_line()
 
 def print_line():
     # Prints a line
     # Returns: None
     print ("-"*130)
 
-def print_totals(total_cars, total_peds, avg_bikes):
+def print_totals(total_cars, total_peds, avg_bikes): 
     # Prints the total cars, total pedestrians, and average bikes
     # after all observations are displayed.
     # Returns: None
@@ -181,9 +181,9 @@ def print_totals(total_cars, total_peds, avg_bikes):
 #starting
 
 print_table_header()
-print_line()
+
 # For each observation row, use format_observation_row()
 for ob in observations:
     format_observation_row(ob)
-
+print_line()
 print_totals(get_total_cars(observations), get_total_pedestrians(observations), round(get_average_bikes(observations),2))
