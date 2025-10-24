@@ -186,4 +186,6 @@ print_table_header()
 for ob in observations:
     format_observation_row(ob)
 print_line()
+
+#print totals
 print_totals(get_total_cars(observations), get_total_pedestrians(observations), round(get_average_bikes(observations),2))
