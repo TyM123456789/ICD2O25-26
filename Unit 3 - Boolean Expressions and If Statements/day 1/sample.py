@@ -1,0 +1,9 @@
+x = 10
+print(x == 10)
+print(3.5 <= 3.5)
+s = "Hello"
+print(len(s) > 3)
+t = "YES"
+print(t.lower() == "yes")
+name = "Chris"
+print(name[:3].lower() == "chr")
