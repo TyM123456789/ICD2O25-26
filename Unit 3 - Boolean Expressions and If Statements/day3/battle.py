@@ -69,7 +69,8 @@ def create_character():
     #gets name. name is used in end stats
     name = input("Enter your character's name: ")
     #choose a pokemon
-    pokemon = int(input("What Pokemon do you want to start with? Charmander(1), Bulbasaur(2), or Squirtle(3)"))
+    print (f"What Pokemon do you want to start with? {poke_dict[1]["Name"]}(1), {poke_dict[2]["Name"]}(2), or {poke_dict[3]["Name"]}(3)")
+    pokemon = int(input(""))
     #if answer wasn't one of the options
     if pokemon > 3 or pokemon < 1:
         print ("That is not one of the options. You will use Charmander.")
@@ -109,7 +110,7 @@ def start_shop():
             exit = True
         else:
             #asks for another input and explains how to exit
-            print ("How many do you want to buy? Press 0 to exit.")
+            print (f"How many {shop[item]["Name"]}'s do you want to buy? Press 0 to exit.")
             #for later use
             totcost = 100000
             #while total cost too expensive (lets player enter again if answer is invalid)
@@ -132,14 +133,15 @@ def sell_pokemon():
     #adds up mmoney made from selling dead/caught pokemon. uses for loop to increase randomness
     for x in range(1,pokemon_caught+1):
         killed_tot += randint(13,15)
-    for x in range(1,len(party)+1):
+    for x in range(1,len(party)):
         if x != 0:
             caught_tot += randint(15,17)
-            del party[x]
+            del party[1]
     print (f"You killed {pokemon_killed} Pokemon in the past {fights_won} fights!")
     print (f"You sold their bodies for a total of {killed_tot} Pokedollars!")
     print (f"You caught {pokemon_caught} Pokemon in the past {fights_won} fights!")
     print (f"You sold their bodies for a total of {caught_tot} Pokedollars!")
+    coins += killed_tot + caught_tot
 #shop at 5 fights won
 def midway_shop():
     #same as other shop but with more options.
@@ -164,7 +166,7 @@ def midway_shop():
             print ("You exit the shop.")
             exit = True
         elif shop[item]["Multiple"]==True:
-            print ("How many do you want to buy? Press 0 to exit.")
+            print (f"How many {shop[item]["Name"]}'s do you want to buy? Press 0 to exit.")
             totcost = 100000
             while coins < totcost:
                 amount = int(input(""))
@@ -278,13 +280,14 @@ def battle():
     def crit_calc():
         num = randint(1,24)
         if num == 1:
+            print ("It was a critical hit!")
             return 1.5
         else:
             return 1
     # calculates catch
     def throw_pokeball():
         global enhp, pokemon_caught
-        #gives value from 1 to enemy hp
+        #gives value from 1 to max enemy hp
         catch_num = randint(1,poke_dict[enemy]["Health"])
         #if catch value is more than or equal to 90% of enemy health
         if catch_num >= enhp*.9:
@@ -321,8 +324,6 @@ def battle():
         #finds damage value of move
         rawdam = move_dict[attack]["Damage"]
         random = (randint(85,100))
-        #i dont think i should need to global crit but it wasnt working before
-        global crit
         crit = crit_calc()
         #damage * attack stat * 1/opponent defense * weakness or resistance * STAB (same type attack bonus) * randomness (.85 to 1) * crit (1/24 for 1.5x)
         #also prints to check math
@@ -378,8 +379,6 @@ def battle():
             enhp -= damage
             enhp = int(round(enhp,0))
             print (f"Your {poke_dict[pokemon]["Name"]} used {poke_dict[pokemon]["Move"][choice]}")
-            if crit == 1.5:
-                print ("It was a critical hit!")
             if enhp > 0:
                 print (f"It did {int(round(damage,0))} damage! The enemy {poke_dict[enemy]["Name"]} is now at {int(round(enhp,0))} health!")
             else:
@@ -434,8 +433,6 @@ def battle():
             plhp -= damage
             plhp = int(round(plhp,0))
             print (f"The enemy {poke_dict[enemy]["Name"]} used {best_move}")
-            if crit == 1.5:
-                print ("It was a critical hit!")
             if plhp > 0:
                 print (f"It did {int(round(damage,0))} damage! Your {poke_dict[pokemon]["Name"]} is now at {int(round(plhp,0))} health!")
             else:
