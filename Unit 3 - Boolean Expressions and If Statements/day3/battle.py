@@ -3,7 +3,6 @@
 # 2. change stats screen
 # 3. could make some code shorter by making a dict for repetitive with slightly different wording (like the stat mod code)
 # 4. Change enemy ai abit. some updates to how effects are used for player may have some effect on enemy ai if i change that
-# 5. add text for when an attack is super/not very effective
 #resets attack modifiers for player and enemy
 def reset_modifiers():
     global platk, enatk, pldef, endef, permplatk, permenatk, permpldef, permendef
@@ -28,7 +27,7 @@ poke_dict = {
     2: {"Name": "Bulbasaur", "Type": ["","Grass"], "Health": 150, "Move": ["", "Growl", "Tackle", "Vine Whip"]},
     3: {"Name": "Squirtle", "Type": ["","Water"], "Health": 150, "Move": ["", "Growl", "Tackle", "Water Gun"]},
     4: {"Name": "Pikachu", "Type": ["","Electric"], "Health": 150, "Move": ["", "Growl", "Tackle", "Thunder Shock"]},
-    5: {"Name": "A gun", "Type": ["","Steel"], "Health": 1000, "Move": ["", "Shoot Hands", "Shoot Chest", "Load Explosive Ammo", "Shoot Head"]},
+    5: {"Name": "A Gun", "Type": ["","Steel"], "Health": 1000, "Move": ["", "Shoot Hands", "Shoot Chest", "Load Explosive Ammo", "Shoot Head"]},
     6: {"Name": "Punching Bag", "Type": ["","Fighting"], "Health": 1000000, "Move": []}
 }
 #dictionary of moves. 
@@ -88,7 +87,7 @@ def create_character():
     poke2 = 2
     poke3 = 5
     #choose a pokemon
-    print (f"What Pokemon do you want to start with? {poke_dict[poke1]["Name"]}(1), {poke_dict[poke2]["Name"]}(2), or {poke_dict[poke3]["Name"]}({3})")
+    print (f"What Pokemon do you want to start with? {poke_dict[poke1]["Name"]}(1), {poke_dict[poke2]["Name"]}(2), or {poke_dict[poke3]["Name"]}(3)")
     pokemon = int(input(""))
     #if answer wasn't one of the options
     if pokemon > 3 or pokemon < 1:
@@ -312,6 +311,18 @@ def battle():
             if type in type_chart.get(attack_type, {}):
                 mult *= type_chart[attack_type][type]
         return mult
+    #prints message based on effectiveness
+    def effect_text(effectiveness):
+        if effectiveness == 4:
+            printsleep ("It was extremely effective!", s)
+        elif effectiveness == 2:
+            printsleep ("It was super effective!", s)
+        elif effectiveness == .5:
+            printsleep ("It was not very effective...", s)
+        elif effectiveness == .25:
+                printsleep ("It was mostly ineffective...", s)
+        elif effectiveness == 0:
+            printsleep ("It has no effect...", s)        
     #checks if pokemon type is same as attack type. if so, 50% dam boost
     def stab(attack, poke):
         #the mechanic STAB (same type attack bonus) provides 1.5x mult if pokemon type is same is it's move
@@ -385,7 +396,6 @@ def battle():
             return (2+stg)/2    
     #add/subtract effect
     def mod_effect(stg, direction, amount):
-        print (amount)
         #changes stage
         if direction:
             stg+=1*amount
@@ -433,6 +443,8 @@ def battle():
             enhp -= damage
             enhp = int(round(enhp,0))
             printsleep (f"Your {poke_dict[pokemon]["Name"]} used {poke_dict[pokemon]["Move"][choice]}", s)
+            move_effect = weakness(poke_to_move_dict(pokemon, choice), enemy)
+            effect_text(move_effect)
             if crit == 1.5:
                 printsleep ("It was a critical hit!", s)
             if enhp > 0:
@@ -443,7 +455,8 @@ def battle():
                 enhp = "Dead"
         if choice != 0 and len(move_dict[poke_to_move_dict(pokemon, choice)]["Effect"]) == 4 and enhp != "Dead":
             move = poke_to_move_dict(pokemon, choice)
-            printsleep (f"Your {poke_dict[pokemon]["Name"]} used {poke_dict[pokemon]["Move"][choice]}", s)
+            if move_dict[poke_to_move_dict(pokemon, choice)]["Damage"] == 0:
+                printsleep (f"Your {poke_dict[pokemon]["Name"]} used {poke_dict[pokemon]["Move"][choice]}", s)
             stg, type, targ = apply_effect(pokemon, move, platk, pldef, enatk, endef)
             if type == "a" and targ == "a":
                 platk = stg
@@ -485,12 +498,15 @@ def battle():
                     dam, crit = damage_calc(enemy, pokemon, move_num, enatk, pldef)
                     if dam > move_damage:
                         best_move = move
+                        best_move_num = move_num
                         move_damage = dam
                         move_crit = crit
+            move_effect = weakness(poke_to_move_dict(pokemon, best_move_num), pokemon)
             damage = move_damage
             plhp -= damage
             plhp = int(round(plhp,0))
             printsleep (f"The enemy {poke_dict[enemy]["Name"]} used {best_move}", s)
+            effect_text(move_effect)
             if move_crit == 1.5:
                 printsleep ("It was a critical hit!", s)
             if plhp > 0:
