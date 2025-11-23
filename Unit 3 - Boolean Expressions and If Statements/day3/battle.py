@@ -1,7 +1,8 @@
 #THINGS TO ADD OR FIX FOR LATER
-# 1. reassigning cost twice (once in start shop, once in midway shop) can make prices far off from intended.
 # 2. Pauses to make text easier to read
-# 3. add more comments (stopped commenting at def attack())
+# 3. Make it so u cant buy intimidate/strong start more than once (a bit op)
+# 4. add more comments (stopped commenting at def attack())
+# 5. change stats screen
 #resets attack modifiers for player and enemy
 def reset_modifiers():
     global platk, enatk, pldef, endef, permplatk, permenatk, permpldef, permendef
@@ -13,6 +14,7 @@ def reset_modifiers():
 #imports randint
 from random import randint
 from time import sleep
+from copy import deepcopy
 # dictionary of pokemon
 # call by poke_dict[1]["Name"]
 poke_dict = {
@@ -57,11 +59,11 @@ bag = {
 }
 #shop inventory call by shop[(item#)]["Name"]
 shop = {
-    1: {"Name": "Potion", "Description": "Heals Pokemon by 50 HP", "Cost": 4, "Multiple": True},
-    2: {"Name": "Pokeball", "Description": "Chance to catch enemy Pokemon","Cost": 6, "Multiple": True},
-    3: {"Name": "Intimidate", "Description": "Enemy starts fight with -1 atk", "Cost": 10, "Multiple": False},
-    4: {"Name": "Strong Start", "Description": "Start fight with +1 atk", "Cost": 10, "Multiple": False},
-    5: {"Name": "Full Heal", "Description": "Heals Pokemon to full health", "Cost": 8, "Multiple": False}
+    1: {"Name": "Potion", "Description": "Heals Pokemon by 50 HP", "Cost": 4, "Multiple": True, "Amount": 99},
+    2: {"Name": "Pokeball", "Description": "Chance to catch enemy Pokemon","Cost": 6, "Multiple": True, "Amount": 99},
+    3: {"Name": "Intimidate", "Description": "Enemy starts fight with -1 atk", "Cost": 10, "Multiple": False, "Amount": 1},
+    4: {"Name": "Strong Start", "Description": "Start fight with +1 atk", "Cost": 10, "Multiple": False, "Amount": 1},
+    5: {"Name": "Full Heal", "Description": "Heals Pokemon to full health", "Cost": 8, "Multiple": False, "Amount": 1}
 }
 #gets player name and starter pokemon. makes global
 def create_character():
@@ -78,21 +80,23 @@ def create_character():
     party = [poke_dict[pokemon]["Name"]]
 #starting shop
 def start_shop():
-    global bag, coins, shop
+    global bag, coins
     exit = False
     print (f"Before embarking on your journey, you go to the Pokeshop.")
+    #creates new dictionary to not mod original shop values
+    startshop = deepcopy(shop)
     #assigns costs for each item (costs are random)
-    for product in shop:
-        shop[product]["Cost"] = item_cost(product)
+    for product in startshop:
+        startshop[product]["Cost"] = item_cost(product, startshop)
     #makes it so player can go to shop menu multiple times to buy multiple things. cancelled by exitting
     while exit == False:
         #prints headers
-        print (f"{"Items":<10}{f"Pokedollars: {coins}":>50}")
-        print ("-"*61)
+        print (f"{"Items":<14}{f"Pokedollars: {coins}":>50}")
+        print ("-"*65)
         #for each product, format a row
         for x in range (1,3):
-            format_row(shop[x]["Name"], x, shop[x]["Description"], shop[x]["Cost"])
-        print ("-"*61)
+            format_row(startshop[x]["Name"],  startshop[x]["Amount"], x, startshop[x]["Description"], startshop[x]["Cost"])
+        print ("-"*65)
         #tells player how to exit
         print ("Exit (3)")
         #sets item to 0 for later use
@@ -110,20 +114,24 @@ def start_shop():
             exit = True
         else:
             #asks for another input and explains how to exit
-            print (f"How many {shop[item]["Name"]}'s do you want to buy? Press 0 to exit.")
+            print (f"How many {startshop[item]["Name"]}'s do you want to buy? Press 0 to exit.")
             #for later use
             totcost = 100000
+            amount = 0
             #while total cost too expensive (lets player enter again if answer is invalid)
-            while coins < totcost:
+            while coins < totcost or amount > startshop[item]["Amount"]:
                 amount = int(input(""))
                 #calculates cost
-                totcost = amount * shop[item]["Cost"]
+                totcost = amount * startshop[item]["Cost"]
                 #gives error if cost is too high
                 if totcost > coins:
-                    print (f"You can't afford {amount} {shop[item]["Name"]}'s")
+                    print (f"You can't afford {amount} {startshop[item]["Name"]}'s")
+                elif amount > startshop[item]["Amount"]:
+                    print (f"There are only {startshop[item]["Amount"]} {startshop[item]["Name"]}'s in stock.")
             #subtracts cost
             coins -= totcost
             #adds item to bag
+            startshop[item]["Amount"] -= amount
             bag[item]["Amount"] += amount
 #sells caught/killed pokemon
 def sell_pokemon():
@@ -148,54 +156,63 @@ def midway_shop():
     global bag, coins, shop, permplatk, permenatk, plhp
     exit = False
     print (f"Along your journey, you see a Pokeshop.")
-    for product in shop:
-        shop[product]["Cost"] = item_cost(product)
+    midshop = shop
+    for product in midshop:
+        midshop[product]["Cost"] = item_cost(product, midshop)
     while exit == False:
-        print (f"{"Items":<10}{f"Pokedollars: {coins}":>50}")
-        print ("-"*61)
-        for x in shop:
-            format_row(shop[x]["Name"], x, shop[x]["Description"], shop[x]["Cost"])
-        print ("-"*61)
-        print (f"Exit ({len(shop)+1})")
+        print (f"{"Items":<14}{f"Pokedollars: {coins}":>50}")
+        print ("-"*65)
+        for x in midshop:
+            format_row(midshop[x]["Name"], midshop[x]["Amount"], x, midshop[x]["Description"], midshop[x]["Cost"])
+        print ("-"*65)
+        print (f"Exit ({len(midshop)+1})")
         item = 0
-        while item < 1 or item > len(shop)+1:
+        while item < 1 or item > len(midshop)+1:
             item = int(input(""))
-            if item < 1 or item > len(shop)+1:
+            if item < 1 or item > len(midshop)+1:
                 print ("That is not an option. Try Again.")
-        if item == len(shop)+1:
+        if item == len(midshop)+1:
             print ("You exit the shop.")
             exit = True
-        elif shop[item]["Multiple"]==True:
-            print (f"How many {shop[item]["Name"]}'s do you want to buy? Press 0 to exit.")
+        elif midshop[item]["Multiple"]==True:
+            print (f"How many {midshop[item]["Name"]}'s do you want to buy? Press 0 to exit.")
             totcost = 100000
-            while coins < totcost:
+            while coins < totcost or amount > midshop[item]["Amount"]:
                 amount = int(input(""))
-                totcost = amount * shop[item]["Cost"]
+                totcost = amount * midshop[item]["Cost"]
                 if totcost > coins:
-                    print (f"You can't afford {amount} {shop[item]["Name"]}'s")
+                    print (f"You can't afford {amount} {midshop[item]["Name"]}'s")
+                elif amount > midshop[item]["Amount"]:
+                    print (f"There are only {midshop[item]["Amount"]} {midshop[item]["Name"]}'s in stock.")
             coins -= totcost
             bag[item]["Amount"] += amount
         else:
-            if shop[item]["Cost"] <= coins:
-                if shop[item]["Name"] == "Strong Start":
+            if midshop[item]["Cost"] <= coins and midshop[item]["Amount"] >0:
+                if midshop[item]["Name"] == "Strong Start":
                     permplatk += 1
-                    coins -= shop[item]["Cost"]
-                elif shop[item]["Name"] == "Intimidate":
+                    midshop[item]["Amount"] -= 1
+                    coins -= midshop[item]["Cost"]
+                elif midshop[item]["Name"] == "Intimidate":
                     permenatk -= 1
-                    coins -= shop[item]["Cost"]
-                elif shop[item]["Name"] == "Full Heal":
+                    midshop[item]["Amount"] -= 1
+                    coins -= midshop[item]["Cost"]
+                elif midshop[item]["Name"] == "Full Heal":
                     plhp = poke_dict[pokemon]["Health"]
-                print (f"You bought {shop[item]["Name"]}!")
-            else:
-                print (f"You can't afford {shop[item]["Name"]}.")
+                    midshop[item]["Amount"] -= 1
+                    coins -= midshop[item]["Cost"]
+                print (f"You bought {midshop[item]["Name"]}!")
+            elif midshop[item]["Cost"] > coins:
+                print (f"You can't afford {midshop[item]["Name"]}.")
+            elif midshop[x]["Amount"] <= 0:
+                print (f"There are no more {midshop[item]["Name"]}'s in stock.")
 #formats shop row
-def format_row(name, num, desc, cost):
+def format_row(name, amount, num, desc, cost):
     #formats shop row
-    print (f"{name:<15}{f"({num})":<5}{desc:<30}{cost:>10}P")
+    print (f"{name:<15}{f"{amount}x":<4}{f"({num})":<5}{desc:<30}{cost:>10}P")
 #generates item cost 
-def item_cost(item):
+def item_cost(item, shop_cata):
     #creates a random item cost
-    return randint(shop[item]["Cost"]-1, shop[item]["Cost"]+1)
+    return randint(shop_cata[item]["Cost"]-1, shop_cata[item]["Cost"]+1)
 #sets up player hp and enemy hp and makes global
 def setup():
     global plhp, coins, permenatk, permplatk, permendef, permpldef, pokemon_caught, pokemon_killed
@@ -280,7 +297,6 @@ def battle():
     def crit_calc():
         num = randint(1,24)
         if num == 1:
-            print ("It was a critical hit!")
             return 1.5
         else:
             return 1
@@ -328,7 +344,7 @@ def battle():
         #damage * attack stat * 1/opponent defense * weakness or resistance * STAB (same type attack bonus) * randomness (.85 to 1) * crit (1/24 for 1.5x)
         #also prints to check math
         #print (f"{rawdam} * {pokeatk} * (1/{oppdef}) * {weakness(attack, opppoke)} * {stab(attack, poke)} * ({random}/100)1 * {crit}")
-        return (rawdam * stg_to_mod(pokeatk) * (1/stg_to_mod(oppdef)) * weakness(attack, opppoke) * stab(attack, poke) * random/100 * crit)
+        return (rawdam * stg_to_mod(pokeatk) * (1/stg_to_mod(oppdef)) * weakness(attack, opppoke) * stab(attack, poke) * random/100 * crit), crit
     #stg to mod
     def stg_to_mod(stg):
         #translates stage of stat (+1) atk for example to modifier (in +1 attack's case, it would be 3/2)
@@ -374,11 +390,13 @@ def battle():
         elif choice == len(poke_dict[pokemon]["Move"]):
             player_turn()
         elif move_dict[choice]["Damage"] > 0:
-            damage = damage_calc(pokemon, enemy, choice, platk, endef)
+            damage, crit = damage_calc(pokemon, enemy, choice, platk, endef)
             global enhp
             enhp -= damage
             enhp = int(round(enhp,0))
             print (f"Your {poke_dict[pokemon]["Name"]} used {poke_dict[pokemon]["Move"][choice]}")
+            if crit == 1.5:
+                print ("It was a critical hit!")
             if enhp > 0:
                 print (f"It did {int(round(damage,0))} damage! The enemy {poke_dict[enemy]["Name"]} is now at {int(round(enhp,0))} health!")
             else:
@@ -425,14 +443,19 @@ def battle():
             for move in moves:
                 move_num = moves.index(move)
                 if move_num != 0:
-                    dam = damage_calc(enemy, pokemon, move_num, enatk, pldef)
+                    dam , crit = damage_calc(enemy, pokemon, move_num, enatk, pldef)
                     if dam > move_damage:
                         best_move = move
                         move_damage = dam
+                        crit = crit
+                    else:
+                        crit = 1
             damage = move_damage
             plhp -= damage
             plhp = int(round(plhp,0))
             print (f"The enemy {poke_dict[enemy]["Name"]} used {best_move}")
+            if crit == 1.5:
+                print ("It was a critical hit!")
             if plhp > 0:
                 print (f"It did {int(round(damage,0))} damage! Your {poke_dict[pokemon]["Name"]} is now at {int(round(plhp,0))} health!")
             else:
@@ -458,6 +481,7 @@ turn = 0
 fights_won = 0
 setup()
 start_shop()
+print (shop)
 while plhp != "Dead" and fights_won < 10:
     if fights_won == 5:
         sell_pokemon()
