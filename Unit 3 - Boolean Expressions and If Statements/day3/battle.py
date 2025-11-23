@@ -1,7 +1,9 @@
 #THINGS TO ADD OR FIX FOR LATER
-# 2. Pauses to make text easier to read
-# 4. add more comments (stopped commenting at def attack())
-# 5. change stats screen
+# 1. add more comments (stopped commenting at def attack())
+# 2. change stats screen
+# 3. could make some code shorter by making a dict for repetitive with slightly different wording (like the stat mod code)
+# 4. Change enemy ai abit. some updates to how effects are used for player may have some effect on enemy ai if i change that
+# 5. add text for when an attack is super/not very effective
 #resets attack modifiers for player and enemy
 def reset_modifiers():
     global platk, enatk, pldef, endef, permplatk, permenatk, permpldef, permendef
@@ -15,7 +17,7 @@ from random import randint
 from time import sleep
 from copy import deepcopy
 #sets amount of time to sleep between text
-s = 0
+s = .75
 def printsleep(str, time):
     print (str)
     sleep(time)
@@ -25,6 +27,9 @@ poke_dict = {
     1: {"Name": "Charmander", "Type": ["","Fire"], "Health": 150, "Move": ["", "Growl", "Tackle", "Ember"]},
     2: {"Name": "Bulbasaur", "Type": ["","Grass"], "Health": 150, "Move": ["", "Growl", "Tackle", "Vine Whip"]},
     3: {"Name": "Squirtle", "Type": ["","Water"], "Health": 150, "Move": ["", "Growl", "Tackle", "Water Gun"]},
+    4: {"Name": "Pikachu", "Type": ["","Electric"], "Health": 150, "Move": ["", "Growl", "Tackle", "Thunder Shock"]},
+    5: {"Name": "A gun", "Type": ["","Steel"], "Health": 1000, "Move": ["", "Shoot Hands", "Shoot Chest", "Load Explosive Ammo", "Shoot Head"]},
+    6: {"Name": "Punching Bag", "Type": ["","Fighting"], "Health": 1000000, "Move": []}
 }
 #dictionary of moves. 
 #call by move_dict[(move#)]["Name"]
@@ -33,7 +38,12 @@ move_dict = {
     2: {"Name": "Tackle", "Type": "Normal", "Damage": 30, "Effect": ""},
     3: {"Name": "Ember", "Type": "Fire", "Damage": 20, "Effect": ""},
     4: {"Name": "Vine Whip", "Type": "Grass", "Damage": 20, "Effect": ""},
-    5: {"Name": "Water Gun", "Type": "Water", "Damage": 20, "Effect": ""}
+    5: {"Name": "Water Gun", "Type": "Water", "Damage": 20, "Effect": ""},
+    6: {"Name": "Thunder Shock", "Type": "Electric", "Damage": 20, "Effect": ""},
+    7: {"Name": "Shoot Head", "Type": "Steel", "Damage": 1000, "Effect": ""},
+    8: {"Name": "Shoot Chest", "Type": "Steel", "Damage": 100, "Effect": "d6D-"},
+    9: {"Name": "Shoot Hands", "Type": "Steel", "Damage": 50, "Effect": "d6A-"},
+    10: {"Name": "Load Explosive Ammo", "Type": "Steel", "Damage": 0, "Effect": "a6A+"}
 }
 #type list
 type_chart = {
@@ -74,13 +84,22 @@ def create_character():
     global name, pokemon, party, shop
     #gets name. name is used in end stats
     name = input("Enter your character's name: ")
+    poke1 = 1
+    poke2 = 2
+    poke3 = 5
     #choose a pokemon
-    print (f"What Pokemon do you want to start with? {poke_dict[1]["Name"]}(1), {poke_dict[2]["Name"]}(2), or {poke_dict[3]["Name"]}(3)")
+    print (f"What Pokemon do you want to start with? {poke_dict[poke1]["Name"]}(1), {poke_dict[poke2]["Name"]}(2), or {poke_dict[poke3]["Name"]}({3})")
     pokemon = int(input(""))
     #if answer wasn't one of the options
     if pokemon > 3 or pokemon < 1:
-        print ("That is not one of the options. You will use Charmander.")
-        pokemon = 1
+        pokemon = poke1
+        print (f"That is not one of the options. You will use {poke_dict[poke1]["Name"]}.")
+    if pokemon == 1:
+        pokemon = poke1
+    elif pokemon == 2:
+        pokemon = poke2
+    else:
+        pokemon = poke3
     party = [poke_dict[pokemon]["Name"]]
 #short intro
 def game_intro():
@@ -107,18 +126,18 @@ def start_shop():
             format_row(startshop[x]["Name"],  startshop[x]["Amount"], x, startshop[x]["Description"], startshop[x]["Cost"])
         print ("-"*65)
         #tells player how to exit
-        print ("Exit (3)")
+        print ("Exit (0)")
         #sets item to 0 for later use
-        item = 0
+        item = -1
         #while loop lets player keep choosing until they settle on a possible option
-        while item < 1 or item > 3:
+        while item < 0 or item > 2:
             #takes input
             item = int(input(""))
             #gives error if answer isnt an option
-            if item < 1 or item > 3:
+            if item < 0 or item > 2:
                 print ("That is not an option. Try Again.")
         #lets player exit
-        if item == 3:
+        if item == 0:
             print ("You exit the shop.")
             exit = True
         else:
@@ -174,13 +193,13 @@ def midway_shop():
         for x in midshop:
             format_row(midshop[x]["Name"], midshop[x]["Amount"], x, midshop[x]["Description"], midshop[x]["Cost"])
         print ("-"*65)
-        print (f"Exit ({len(midshop)+1})")
-        item = 0
-        while item < 1 or item > len(midshop)+1:
+        print (f"Exit (0)")
+        item = -1
+        while item < 0 or item > len(midshop):
             item = int(input(""))
-            if item < 1 or item > len(midshop)+1:
+            if item < 0 or item > len(midshop):
                 print ("That is not an option. Try Again.")
-        if item == len(midshop)+1:
+        if item == 0:
             print ("You exit the shop.")
             exit = True
         elif midshop[item]["Multiple"]==True:
@@ -267,10 +286,10 @@ def battle():
             print (f"{bag[item]["Name"]} x{bag[item]["Amount"]} ({item_num})")
             item_num+=1
         #shows player how to go back
-        print (f"Back ({item_num})")
+        print (f"Back (0)")
         #takes input
         choice = int(input(""))
-        if choice == item_num:
+        if choice == 0:
             player_turn()
         #ends turn if answer isn't accepted
         elif choice >item_num or choice < 1 or bag[choice]["Amount"] == 0:
@@ -366,42 +385,49 @@ def battle():
             return (2+stg)/2    
     #add/subtract effect
     def mod_effect(stg, direction, amount):
+        print (amount)
         #changes stage
-        if direction and stg != 6:
+        if direction:
             stg+=1*amount
-        elif not direction and stg != -6:
+        elif not direction:
             stg-=1*amount
+        if stg > 6:
+            stg = 6
+        elif stg < -6:
+            stg = -6
         return stg
     #calculates effects
-    def apply_effect(movenum, aatk, adef, datk, ddef):
+    def apply_effect(poke, move, aatk, adef, datk, ddef):
         #translates the modifier code to meaning
-        move = move_dict[movenum]["Effect"]
+        move = move_dict[move]["Effect"]
         if move[0] == "a":
             if move[2] == "A":
-                stg = mod_effect(aatk, move[1]=="+", int(move[1]))
+                stg = mod_effect(aatk, move[3]=="+", int(move[1]))
                 return stg, "a", "a"
             elif move[2] == "D":
-                stg = mod_effect(adef, move[1]=="+", int(move[1]))
+                stg = mod_effect(adef, move[3]=="+", int(move[1]))
                 return stg, "d", "a"   
         elif move[0] == "d":
             if move[2] == "A":
-                stg = mod_effect(datk, move[1]=="+", int(move[1]))
+                stg = mod_effect(datk, move[3]=="+", int(move[1]))
                 return stg, "a", "d"
             elif move[2] == "D":
-                stg = mod_effect(ddef, move[1]=="+", int(move[1]))
+                stg = mod_effect(ddef, move[3]=="+", int(move[1]))
                 return stg, "d", "d"                       
     #uses player choice to apply attack.
     def attack():
         global enatk, platk, pldef, endef, enhp, pokemon_killed
-        print (f"Growl (1)\nTackle (2)\n{poke_dict[pokemon]["Move"][3]} (3)")
-        print (f"Back ({len(poke_dict[pokemon]["Move"])})")
+        for move in range(1,len(poke_dict[pokemon]["Move"])):
+            if move != "":
+                print (f"{poke_dict[pokemon]["Move"][move]} ({move})")
+        print (f"Back (0)")
         choice = int(input(""))
-        if choice >len(poke_dict[pokemon]["Move"]) or choice < 1:
+        if choice != 0 and choice >len(poke_dict[pokemon]["Move"])-1 or choice < 0:
             print (f"Your {poke_dict[pokemon]["Name"]} didn't understand your command.")
             choice = 0
-        elif choice == len(poke_dict[pokemon]["Move"]):
+        elif choice == 0:
             player_turn()
-        elif move_dict[choice]["Damage"] > 0:
+        elif move_dict[poke_to_move_dict(pokemon, choice)]["Damage"] > 0:
             damage, crit = damage_calc(pokemon, enemy, choice, platk, endef)
             global enhp
             enhp -= damage
@@ -415,12 +441,13 @@ def battle():
                 printsleep (f"You did {int(round(damage,0))} damage! The enemy {poke_dict[enemy]["Name"]} fainted.", s)
                 pokemon_killed += 1
                 enhp = "Dead"
-        if len(move_dict[choice]["Effect"]) == 4:
+        if choice != 0 and len(move_dict[poke_to_move_dict(pokemon, choice)]["Effect"]) == 4 and enhp != "Dead":
+            move = poke_to_move_dict(pokemon, choice)
             printsleep (f"Your {poke_dict[pokemon]["Name"]} used {poke_dict[pokemon]["Move"][choice]}", s)
-            stg, type, targ = apply_effect(choice, platk, pldef, enatk, endef)
+            stg, type, targ = apply_effect(pokemon, move, platk, pldef, enatk, endef)
             if type == "a" and targ == "a":
                 platk = stg
-                printsleep (f"Your {poke_dict[pokemon]["Name"]}'s attack is now at stage {platk} ({round(stg_to_mod(platk,2))}x)", s) 
+                printsleep (f"Your {poke_dict[pokemon]["Name"]}'s attack is now at stage {platk} ({round(stg_to_mod(platk), 2)}x)", s) 
             elif type == "a" and targ == "d":
                 enatk = stg
                 printsleep (f"The enemy {poke_dict[enemy]["Name"]}'s attack is now at stage {enatk} ({round(stg_to_mod(enatk),2)}x)", s)
@@ -435,7 +462,7 @@ def battle():
         global enatk, platk, pldef, endef, plhp, enhp, party
         if turn == 1:        
             printsleep (f"The enemy {poke_dict[enemy]["Name"]} used {poke_dict[enemy]["Move"][1]}", s)
-            stg, type, targ = apply_effect(1, enatk, endef, platk, pldef)
+            stg, type, targ = apply_effect(enemy, 1, enatk, endef, platk, pldef)
             if type == "a" and targ == "a":
                 enatk = stg
                 printsleep (f"The enemy {poke_dict[enemy]["Name"]}'s attack is now at {enatk} ({round(stg_to_mod(enatk),2)}x)", s) 
@@ -455,18 +482,16 @@ def battle():
             for move in moves:
                 move_num = moves.index(move)
                 if move_num != 0:
-                    dam , crit = damage_calc(enemy, pokemon, move_num, enatk, pldef)
+                    dam, crit = damage_calc(enemy, pokemon, move_num, enatk, pldef)
                     if dam > move_damage:
                         best_move = move
                         move_damage = dam
-                        crit = crit
-                    else:
-                        crit = 1
+                        move_crit = crit
             damage = move_damage
             plhp -= damage
             plhp = int(round(plhp,0))
             printsleep (f"The enemy {poke_dict[enemy]["Name"]} used {best_move}", s)
-            if crit == 1.5:
+            if move_crit == 1.5:
                 printsleep ("It was a critical hit!", s)
             if plhp > 0:
                 printsleep (f"It did {int(round(damage,0))} damage! Your {poke_dict[pokemon]["Name"]} is now at {int(round(plhp,0))} health!", s)
