@@ -1,6 +1,5 @@
 #THINGS TO ADD OR FIX FOR LATER
 # 2. Pauses to make text easier to read
-# 3. Make it so u cant buy intimidate/strong start more than once (a bit op)
 # 4. add more comments (stopped commenting at def attack())
 # 5. change stats screen
 #resets attack modifiers for player and enemy
@@ -15,6 +14,11 @@ def reset_modifiers():
 from random import randint
 from time import sleep
 from copy import deepcopy
+#sets amount of time to sleep between text
+s = 0
+def printsleep(str, time):
+    print (str)
+    sleep(time)
 # dictionary of pokemon
 # call by poke_dict[1]["Name"]
 poke_dict = {
@@ -78,11 +82,16 @@ def create_character():
         print ("That is not one of the options. You will use Charmander.")
         pokemon = 1
     party = [poke_dict[pokemon]["Name"]]
+#short intro
+def game_intro():
+    printsleep (f"Welcome to the Kanto region, {name}!", s)
+    printsleep (f"Your starter Pokemon is {poke_dict[pokemon]["Name"]}.", s)
+    printsleep (f"Your journey will be difficult, but you will meet many friends and partners along the way!", s)
 #starting shop
 def start_shop():
     global bag, coins
     exit = False
-    print (f"Before embarking on your journey, you go to the Pokeshop.")
+    printsleep (f"Before embarking on your journey, you go to the Pokeshop.", s)
     #creates new dictionary to not mod original shop values
     startshop = deepcopy(shop)
     #assigns costs for each item (costs are random)
@@ -145,18 +154,18 @@ def sell_pokemon():
         if x != 0:
             caught_tot += randint(15,17)
             del party[1]
-    print (f"You killed {pokemon_killed} Pokemon in the past {fights_won} fights!")
-    print (f"You sold their bodies for a total of {killed_tot} Pokedollars!")
-    print (f"You caught {pokemon_caught} Pokemon in the past {fights_won} fights!")
-    print (f"You sold their bodies for a total of {caught_tot} Pokedollars!")
+    printsleep (f"You killed {pokemon_killed} Pokemon in the past {fights_won} fights!", s)
+    printsleep (f"You sold their bodies for a total of {killed_tot} Pokedollars!", s)
+    printsleep (f"You caught {pokemon_caught} Pokemon in the past {fights_won} fights!", s)
+    printsleep (f"You sold their bodies for a total of {caught_tot} Pokedollars!", s)
     coins += killed_tot + caught_tot
 #shop at 5 fights won
 def midway_shop():
     #same as other shop but with more options.
-    global bag, coins, shop, permplatk, permenatk, plhp
+    global bag, coins, permplatk, permenatk, plhp
     exit = False
-    print (f"Along your journey, you see a Pokeshop.")
-    midshop = shop
+    printsleep (f"Along your journey, you see a Pokeshop.", s)
+    midshop = deepcopy(shop)
     for product in midshop:
         midshop[product]["Cost"] = item_cost(product, midshop)
     while exit == False:
@@ -231,7 +240,7 @@ def encounter():
     global enemy, enhp, fights_won
     #generates an enemy
     enemy = randint(1,3)
-    print(f"In Route {fights_won+1}, you stumble across a wild {poke_dict[enemy]["Name"]}!")
+    printsleep (f"In Route {fights_won+1}, you stumble across a wild {poke_dict[enemy]["Name"]}!", s)
     #sets enemy health
     enhp = poke_dict[enemy]["Health"]
 def battle():
@@ -306,7 +315,10 @@ def battle():
         #gives value from 1 to max enemy hp
         catch_num = randint(1,poke_dict[enemy]["Health"])
         #if catch value is more than or equal to 90% of enemy health
+        printsleep (".", s*1.5)
+        printsleep ("..", s*1.5)
         if catch_num >= enhp*.9:
+            printsleep ("...", s*1.5)
             enhp = "Caught"
             print ("Catch Successful!")
             pokemon_caught +=1
@@ -317,11 +329,11 @@ def battle():
     def heal(health, amount):
         #calculates heal
         if health + amount <= poke_dict[pokemon]["Health"]:
-            print (f"Your {poke_dict[pokemon]["Name"]} is now at {health + amount} HP.")
+            printsleep (f"Your {poke_dict[pokemon]["Name"]} is now at {health + amount} HP.", s)
             return health + amount
         #makes so health cant go above max
         else:
-            print (f"Your {poke_dict[pokemon]["Name"]} is now at {poke_dict[pokemon]["Health"]} HP.")
+            printsleep (f"Your {poke_dict[pokemon]["Name"]} is now at {poke_dict[pokemon]["Health"]} HP.", s)
             return poke_dict[pokemon]["Health"]
     #move in poke_dict to move in move_dict
     def poke_to_move_dict(poke, move):
@@ -394,48 +406,48 @@ def battle():
             global enhp
             enhp -= damage
             enhp = int(round(enhp,0))
-            print (f"Your {poke_dict[pokemon]["Name"]} used {poke_dict[pokemon]["Move"][choice]}")
+            printsleep (f"Your {poke_dict[pokemon]["Name"]} used {poke_dict[pokemon]["Move"][choice]}", s)
             if crit == 1.5:
-                print ("It was a critical hit!")
+                printsleep ("It was a critical hit!", s)
             if enhp > 0:
-                print (f"It did {int(round(damage,0))} damage! The enemy {poke_dict[enemy]["Name"]} is now at {int(round(enhp,0))} health!")
+                printsleep (f"It did {int(round(damage,0))} damage! The enemy {poke_dict[enemy]["Name"]} is now at {int(round(enhp,0))} health!", s)
             else:
-                print (f"You did {int(round(damage,0))} damage! The enemy {poke_dict[enemy]["Name"]} fainted.")
+                printsleep (f"You did {int(round(damage,0))} damage! The enemy {poke_dict[enemy]["Name"]} fainted.", s)
                 pokemon_killed += 1
                 enhp = "Dead"
         if len(move_dict[choice]["Effect"]) == 4:
-            print (f"Your {poke_dict[pokemon]["Name"]} used {poke_dict[pokemon]["Move"][choice]}")
+            printsleep (f"Your {poke_dict[pokemon]["Name"]} used {poke_dict[pokemon]["Move"][choice]}", s)
             stg, type, targ = apply_effect(choice, platk, pldef, enatk, endef)
             if type == "a" and targ == "a":
                 platk = stg
-                print (f"Your {poke_dict[pokemon]["Name"]}'s attack is now at stage {platk} ({round(stg_to_mod(platk,2))}x)") 
+                printsleep (f"Your {poke_dict[pokemon]["Name"]}'s attack is now at stage {platk} ({round(stg_to_mod(platk,2))}x)", s) 
             elif type == "a" and targ == "d":
                 enatk = stg
-                print (f"The enemy {poke_dict[enemy]["Name"]}'s attack is now at stage {enatk} ({round(stg_to_mod(enatk),2)}x)")
+                printsleep (f"The enemy {poke_dict[enemy]["Name"]}'s attack is now at stage {enatk} ({round(stg_to_mod(enatk),2)}x)", s)
             elif type == "d" and targ == "a":
                 pldef = stg
-                print (f"Your {poke_dict[pokemon]["Name"]}'s attack is now at stage {pldef} ({round(stg_to_mod(pldef),2)}x)")
+                printsleep (f"Your {poke_dict[pokemon]["Name"]}'s attack is now at stage {pldef} ({round(stg_to_mod(pldef),2)}x)", s)
             else:
                 endef = stg
-                print (f"The enemy {poke_dict[enemy]["Name"]}'s defense is now at stage {endef} ({round(stg_to_mod(endef),2)}x)")
+                printsleep (f"The enemy {poke_dict[enemy]["Name"]}'s defense is now at stage {endef} ({round(stg_to_mod(endef),2)}x)", s)
     #enemy attack
     def enemy_attack():
         global enatk, platk, pldef, endef, plhp, enhp, party
         if turn == 1:        
-            print (f"The enemy {poke_dict[enemy]["Name"]} used {poke_dict[enemy]["Move"][1]}")
+            printsleep (f"The enemy {poke_dict[enemy]["Name"]} used {poke_dict[enemy]["Move"][1]}", s)
             stg, type, targ = apply_effect(1, enatk, endef, platk, pldef)
             if type == "a" and targ == "a":
                 enatk = stg
-                print (f"The enemy {poke_dict[enemy]["Name"]}'s attack is now at {enatk} ({round(stg_to_mod(enatk),2)}x)") 
+                printsleep (f"The enemy {poke_dict[enemy]["Name"]}'s attack is now at {enatk} ({round(stg_to_mod(enatk),2)}x)", s) 
             elif type == "a" and targ == "d":
                 platk = stg
-                print (f"Your {poke_dict[pokemon]["Name"]}'s attack is now at stage {platk} ({round(stg_to_mod(platk),2)}x)")
+                printsleep (f"Your {poke_dict[pokemon]["Name"]}'s attack is now at stage {platk} ({round(stg_to_mod(platk),2)}x)", s)
             elif type == "d" and targ == "a":
                 endef = stg
-                print (f"The enemy {poke_dict[enemy]["Name"]}'s defense is now at stage {endef} ({round(stg_to_mod(endef),2)}x)")
+                printsleep (f"The enemy {poke_dict[enemy]["Name"]}'s defense is now at stage {endef} ({round(stg_to_mod(endef),2)}x)", s)
             else:
                 pldef = stg
-                print (f"Your {poke_dict[pokemon]["Name"]}'s attack is now at stage {pldef} ({round(stg_to_mod(pldef),2)}x)")   
+                printsleep (f"Your {poke_dict[pokemon]["Name"]}'s attack is now at stage {pldef} ({round(stg_to_mod(pldef),2)}x)", s)   
         else:
             best_move = 1
             move_damage = 0
@@ -453,13 +465,13 @@ def battle():
             damage = move_damage
             plhp -= damage
             plhp = int(round(plhp,0))
-            print (f"The enemy {poke_dict[enemy]["Name"]} used {best_move}")
+            printsleep (f"The enemy {poke_dict[enemy]["Name"]} used {best_move}", s)
             if crit == 1.5:
-                print ("It was a critical hit!")
+                printsleep ("It was a critical hit!", s)
             if plhp > 0:
-                print (f"It did {int(round(damage,0))} damage! Your {poke_dict[pokemon]["Name"]} is now at {int(round(plhp,0))} health!")
+                printsleep (f"It did {int(round(damage,0))} damage! Your {poke_dict[pokemon]["Name"]} is now at {int(round(plhp,0))} health!", s)
             else:
-                print (f"It did {int(round(damage,0))} damage! Your {poke_dict[pokemon]["Name"]} fainted.")  
+                printsleep (f"It did {int(round(damage,0))} damage! Your {poke_dict[pokemon]["Name"]} fainted.", s)  
                 del party[0] 
                 plhp = "Dead"    
     #counts turns
@@ -477,11 +489,11 @@ def end_screen():
     print (f"Fights Won: {fights_won}\nPokemon Caught: {pokemon_caught}\nPokemon Killed: {pokemon_killed}")
     print (f"Coins: {coins}\nPotions: {bag[1]["Amount"]}\nPokeballs: {bag[2]["Amount"]}")
 create_character()
+game_intro()
 turn = 0
 fights_won = 0
 setup()
 start_shop()
-print (shop)
 while plhp != "Dead" and fights_won < 10:
     if fights_won == 5:
         sell_pokemon()
