@@ -37,7 +37,7 @@ poke_dict = {
     6: {"Name": "Punching Bag", "Type": ["","Fighting"], "Health": 0, "Move": ["", "Brace For Impact"], "lvl": 100, "hp": 180, "atk": 60, "def": 180, "spatk": 60, "spdef": 180, "spd": 60}
 }
 #list of all possible enemies/starters
-enemies = [1, 2, 3]
+enemies = [3]
 starters = [1, 2, 3]
 #dictionary of moves. 
 #call by move_dict[(move#)]["Name"]    if effect is 4 char, first char is targ, 2nd char is amount, 3rd is stat, last is direction
@@ -430,11 +430,14 @@ def battle():
             return (2+stg)/2    
     #add/subtract effect
     def mod_effect(stg, direction, amount):
+        print (stg)
         #changes stage
         if direction:
             stg+=1*amount
+            print (stg)
         elif not direction:
             stg-=1*amount
+            print (stg)
         if stg > 6:
             stg = 6
         elif stg < -6:
@@ -455,7 +458,8 @@ def battle():
         elif move[0] == "d":
             if move[2] == "A":
                 stg = mod_effect(datk, move[3]=="+", int(move[1]))
-                return stg, "a", "d"
+                print (stg)
+                return (stg),("a"), ("d")
             elif move[2] == "D":
                 stg = mod_effect(ddef, move[3]=="+", int(move[1]))
                 return stg, "d", "d"                       
@@ -489,10 +493,9 @@ def battle():
                 pokemon_killed += 1
                 enhp = "Dead"
         if choice != 0 and len(move_dict[poke_to_move_dict(pokemon, choice)]["Effect"]) == 4 and enhp != "Dead":
-            move = poke_to_move_dict(pokemon, choice)
             if move_dict[poke_to_move_dict(pokemon, choice)]["Power"] == 0:
                 printsleep (f"Your {pokemon["Name"]} used {pokemon["Move"][choice]}", s)
-            stg, type, targ = apply_effect(pokemon, move, platk, pldef, enatk, endef)
+            stg, type, targ = apply_effect(pokemon, choice, platk, pldef, enatk, endef)
             if type == "a" and targ == "a":
                 platk = stg
                 printsleep (f"Your {pokemon["Name"]}'s attack is now at stage {platk} ({round(stg_to_mod(platk), 2)}x)", s) 
