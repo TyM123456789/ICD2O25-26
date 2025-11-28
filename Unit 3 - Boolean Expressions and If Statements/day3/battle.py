@@ -22,7 +22,7 @@ from time import sleep
 from copy import deepcopy
 from math import floor
 #sets amount of time to sleep between text
-s = 0
+s = 0.75
 def printsleep(str, time):
     print (str)
     sleep(time)
@@ -37,7 +37,7 @@ poke_dict = {
     6: {"Name": "Punching Bag", "Type": ["","Fighting"], "Health": 0, "Move": ["", "Brace For Impact"], "lvl": 100, "hp": 180, "atk": 60, "def": 180, "spatk": 60, "spdef": 180, "spd": 60}
 }
 #list of all possible enemies/starters
-enemies = [3]
+enemies = [1,2,3]
 starters = [1, 2, 3]
 #dictionary of moves. 
 #call by move_dict[(move#)]["Name"]    if effect is 4 char, first char is targ, 2nd char is amount, 3rd is stat, last is direction
@@ -91,20 +91,32 @@ shop = {
 }
 #calculates pokemon max hp
 def hp_calc(poke):
-    return floor((2*poke["hp"]*poke["lvl"])/100+poke["lvl"]+10)
+    return max(1,floor((2*poke["hp"]*poke["lvl"])/100+poke["lvl"]+10))
 #gets player name and starter pokemon. makes global
 def create_character():
     global name, pokemon, party, shop
     #gets name. name is used in end stats
     name = input("Enter your character's name: ")
+    choice = 5
+    confirm = "0"
     #choose a pokemon
-    print (f"What Pokemon do you want to start with? {poke_dict[starters[0]]["Name"]}(1), {poke_dict[starters[1]]["Name"]}(2), or {poke_dict[starters[2]]["Name"]}(3)")
-    choice = int(input(""))
-    #if answer wasn't one of the options
-    if choice > 3 or choice < 1:
-        choice = starters[0]
-        print (f"That is not one of the options. You will use {poke_dict[starters[0]]["Name"]}.")
+    while choice > 3 or choice < 1 or confirm != "1":
+        print (f"What Pokemon do you want to start with? {poke_dict[starters[0]]["Name"]}(1), {poke_dict[starters[1]]["Name"]}(2), or {poke_dict[starters[2]]["Name"]}(3)")
+        choice = int(input(""))
+        #if answer wasn't one of the options
+        if choice > 3 or choice < 1:
+            print (f"That is not one of the options. Try again.")
+        else:
+            print (f"{f"Name: {poke_dict[starters[choice - 1]]["Name"]}":<20}{f"Level: {poke_dict[starters[choice - 1]]["lvl"]+1}":>39}")
+            print (f"Type(s): {" and ".join(poke_dict[starters[choice - 1]]["Type"][1:])}")
+            print ("Stats:")
+            print (f"{f"Health: {poke_dict[starters[choice - 1]]["hp"]}":<20}{f"Speed: {poke_dict[starters[choice - 1]]["spd"]}":>39}")
+            print (f"{f"Attack: {poke_dict[starters[choice - 1]]["atk"]}":<20}{f"Defense: {poke_dict[starters[choice - 1]]["def"]}":>39}")
+            print (f"{f"Special Attack: {poke_dict[starters[choice - 1]]["spatk"]}":<20}{f"Special Defense: {poke_dict[starters[choice - 1]]["spdef"]}":>39}")
+            print ("Are you sure you want to pick this pokemon? Yes(1) or No(0)")
+            confirm = input("")
     pokemon = deepcopy(poke_dict[starters[choice - 1]])
+    pokemon["lvl"] += 1
     pokemon["Health"] = hp_calc(pokemon)
     party = [pokemon["Name"]]
 #short intro
@@ -175,7 +187,6 @@ def sell_pokemon():
     #adds up mmoney made from selling dead/caught pokemon. uses for loop to increase randomness
     for x in range(1,pokemon_killed+1):
         killed_tot += randint(13,15)
-        print ("test")
     for x in range(1,len(party)):
         if x != 0:
             caught_tot += randint(15,17)
@@ -253,7 +264,7 @@ def setup():
     global plhp, coins, permenatk, permplatk, permendef, permpldef, pokemon_caught, pokemon_killed, xp
     #resets all stats
     permplatk = 0
-    permenatk = -6
+    permenatk = 0
     permpldef = 0
     permendef = 0
     coins = 75
@@ -268,6 +279,8 @@ def level_up():
     xp = 0
     pokemon["lvl"]+=1
     pokemon["Health"] = hp_calc(pokemon)
+    print (f"You leveled up! Your level is now {pokemon["lvl"]}!")
+    print (f"Your max HP is now {pokemon["Health"]}!")
 #randomizes and enemy between the available pokemon and prints a small message
 def encounter():
     global enemy, enhp, fights_won
@@ -430,14 +443,11 @@ def battle():
             return (2+stg)/2    
     #add/subtract effect
     def mod_effect(stg, direction, amount):
-        print (stg)
         #changes stage
         if direction:
             stg+=1*amount
-            print (stg)
         elif not direction:
             stg-=1*amount
-            print (stg)
         if stg > 6:
             stg = 6
         elif stg < -6:
