@@ -22,7 +22,7 @@ from time import sleep
 from copy import deepcopy
 from math import floor
 #sets amount of time to sleep between text
-s = 0
+s = 0.5
 def printsleep(str, time):
     print (str)
     sleep(time)
@@ -32,33 +32,34 @@ poke_dict = {
     1: {"Name": "Charmander", "Type": ["","Fire"], "Health": 0, "Move": ["", "Growl", "Tackle", "Ember"], "lvl": 4, "hp": 39, "atk": 52, "def": 43, "spatk": 60, "spdef": 50, "spd": 65},
     2: {"Name": "Bulbasaur", "Type": ["","Grass", "Poison"], "Health": 0, "Move": ["", "Growl", "Tackle", "Vine Whip"], "lvl": 4, "hp": 45, "atk": 49, "def": 65, "spatk": 65, "spdef": 45, "spd": 45},
     3: {"Name": "Squirtle", "Type": ["","Water"], "Health": 0, "Move": ["", "Tail Whip", "Tackle", "Water Gun"], "lvl": 4, "hp": 44, "atk": 48, "def": 65, "spatk": 50, "spdef": 64, "spd": 43},
-    4: {"Name": "Pikachu", "Type": ["","Electric"], "Health": 0, "Move": ["", "Growl", "Tail Whip", "Tackle", "Thunder Shock"], "lvl": 4, "hp": 35, "atk": 55, "def": 40, "spatk": 50, "spdef": 50, "spd": 90},
+    4: {"Name": "Pikachu", "Type": ["","Electric"], "Health": 0, "Move": ["", "Growl", "Quick Attack", "Tail Whip", "Thunder Shock"], "lvl": 4, "hp": 35, "atk": 55, "def": 40, "spatk": 50, "spdef": 50, "spd": 90},
     5: {"Name": "Mimikyu", "Type": ["","Ghost", "Fairy"], "Health": 0, "Move": ["", "Astonish", "Scratch", "Splash", "Wood Hammer"], "lvl": 4, "hp": 55, "atk": 90, "def": 80, "spatk": 50, "spdef": 105, "spd": 96}, #also has astonish
-    6: {"Name": "A Gun", "Type": ["","Steel"], "Health": 0, "Move": ["", "Shoot Hands", "Shoot Chest", "Load Explosive Ammo", "Shoot Head"], "lvl": 99, "hp": 120, "atk": 160, "def": 120, "spatk": 120, "spdef": 120, "spd": 160},
-    7: {"Name": "Punching Bag", "Type": ["","Fighting"], "Health": 0, "Move": ["", "Brace For Impact"], "lvl": 99, "hp": 180, "atk": 60, "def": 180, "spatk": 60, "spdef": 180, "spd": 60}
+    6: {"Name": "A Gun", "Type": ["","Steel"], "Health": 0, "Move": ["", "Shoot Hands", "Shoot Chest", "Load Explosive Ammo", "Shoot Head"], "lvl": 50, "hp": 120, "atk": 160, "def": 120, "spatk": 120, "spdef": 120, "spd": 160},
+    7: {"Name": "Punching Bag", "Type": ["","Fighting"], "Health": 0, "Move": ["", "Brace For Impact"], "lvl": 1, "hp": 180, "atk": 60, "def": 180, "spatk": 60, "spdef": 180, "spd": 1}
 }
 #list of all possible enemies/starters
 enemies = [1,2,3]
-starters = [1, 2, 5]
+starters = [1, 2, 6]
 #dictionary of moves. 
 #call by move_dict[(move#)]["Name"]    if effect is 4 char, first char is targ, 2nd char is amount, 3rd is stat, last is direction else, numbers are percent, word after is effect
 move_dict = {
-    1: {"Name": "Growl", "Type": "Normal", "Power": 0, "Effect": "d1A-", "MoveType": "Status"},
-    2: {"Name": "Tail Whip", "Type": "Normal", "Power": 0, "Effect": "d1D-", "MoveType": "Status"},
-    3: {"Name": "Tackle", "Type": "Normal", "Power": 40, "Effect": "", "MoveType": "Phys"},
-    4: {"Name": "Ember", "Type": "Fire", "Power": 40, "Effect": "10Burn", "MoveType": "Spec"},
-    5: {"Name": "Vine Whip", "Type": "Grass", "Power": 45, "Effect": "", "MoveType": "Phys"},
-    6: {"Name": "Water Gun", "Type": "Water", "Power": 40, "Effect": "", "MoveType": "Spec"},
-    7: {"Name": "Thunder Shock", "Type": "Electric", "Power": 40, "Effect": "", "MoveType": "Spec"},
-    8: {"Name": "Shoot Head", "Type": "Steel", "Power": 150, "Effect": "", "MoveType": "Phys"},
-    9: {"Name": "Shoot Chest", "Type": "Steel", "Power": 75, "Effect": "d9D-", "MoveType": "Phys"},
-    10: {"Name": "Shoot Hands", "Type": "Steel", "Power": 60, "Effect": "d9A-", "MoveType": "Phys"},
-    11: {"Name": "Load Explosive Ammo", "Type": "Steel", "Power": 0, "Effect": "a9A+", "MoveType": "Status"},
-    12: {"Name": "Brace For Impact", "Type": "Fighting", "Power": 0, "Effect": "a9D+", "MoveType": "Status"},
-    13: {"Name": "Astonish", "Type": "Ghost", "Power": 30, "Effect": "30Flinch", "MoveType": "Phys"},
-    14: {"Name": "Scratch", "Type": "Normal", "Power": 40, "Effect": "", "MoveType": "Phys"},
-    15: {"Name": "Splash", "Type": "Normal", "Power": 0, "Effect": "", "MoveType": "Spec"},
-    16: {"Name": "Wood Hammer", "Type": "Grass", "Power": 120, "Effect": "33Recoil", "MoveType": "Phys"}
+    1: {"Name": "Growl", "Type": "Normal", "Power": 0, "Effect": "d1A-", "MoveType": "Status", "Priority": 0},
+    2: {"Name": "Tail Whip", "Type": "Normal", "Power": 0, "Effect": "d1D-", "MoveType": "Status", "Priority": 0},
+    3: {"Name": "Tackle", "Type": "Normal", "Power": 40, "Effect": "", "MoveType": "Phys", "Priority": 0},
+    4: {"Name": "Ember", "Type": "Fire", "Power": 40, "Effect": "10Burn", "MoveType": "Spec", "Priority": 0},
+    5: {"Name": "Vine Whip", "Type": "Grass", "Power": 45, "Effect": "", "MoveType": "Phys", "Priority": 0},
+    6: {"Name": "Water Gun", "Type": "Water", "Power": 40, "Effect": "", "MoveType": "Spec", "Priority": 0},
+    7: {"Name": "Thunder Shock", "Type": "Electric", "Power": 40, "Effect": "", "MoveType": "Spec", "Priority": 0},
+    8: {"Name": "Shoot Head", "Type": "Steel", "Power": 150, "Effect": "", "MoveType": "Phys", "Priority": 0},
+    9: {"Name": "Shoot Chest", "Type": "Steel", "Power": 75, "Effect": "d9D-", "MoveType": "Phys", "Priority": 0},
+    10: {"Name": "Shoot Hands", "Type": "Steel", "Power": 60, "Effect": "d9A-", "MoveType": "Phys", "Priority": 0},
+    11: {"Name": "Load Explosive Ammo", "Type": "Steel", "Power": 0, "Effect": "a9A+", "MoveType": "Status", "Priority": 0},
+    12: {"Name": "Brace For Impact", "Type": "Fighting", "Power": 0, "Effect": "a9D+", "MoveType": "Status", "Priority": 0},
+    13: {"Name": "Astonish", "Type": "Ghost", "Power": 30, "Effect": "30Flinch", "MoveType": "Phys", "Priority": 0},
+    14: {"Name": "Scratch", "Type": "Normal", "Power": 40, "Effect": "", "MoveType": "Phys", "Priority": 0},
+    15: {"Name": "Splash", "Type": "Normal", "Power": 0, "Effect": "", "MoveType": "Spec", "Priority": 0},
+    16: {"Name": "Wood Hammer", "Type": "Grass", "Power": 120, "Effect": "33Recoil", "MoveType": "Phys", "Priority": 0},
+    17: {"Name": "Quick Attack", "Type": "Normal", "Power": 40, "Effect": "", "MoveType": "Phys", "Priority": 1}
 }
 #type list
 type_chart = {
@@ -110,18 +111,17 @@ def create_character():
         choice = int(input(""))
         #if answer wasn't one of the options
         if choice > 3 or choice < 1:
-            print (f"That is not one of the options. Try again.")
+            printsleep (f"That is not one of the options. Try again.",s)
         else:
             print (f"{f"Name: {poke_dict[starters[choice - 1]]["Name"]}":<20}{f"Level: {poke_dict[starters[choice - 1]]["lvl"]+1}":>39}")
             print (f"Type(s): {" and ".join(poke_dict[starters[choice - 1]]["Type"][1:])}")
             print ("Stats:")
-            print (f"{f"Health: {poke_dict[starters[choice - 1]]["hp"]}":<20}{f"Speed: {poke_dict[starters[choice - 1]]["spd"]}":>39}")
-            print (f"{f"Attack: {poke_dict[starters[choice - 1]]["atk"]}":<20}{f"Defense: {poke_dict[starters[choice - 1]]["def"]}":>39}")
-            print (f"{f"Special Attack: {poke_dict[starters[choice - 1]]["spatk"]}":<20}{f"Special Defense: {poke_dict[starters[choice - 1]]["spdef"]}":>39}")
-            print ("Are you sure you want to pick this pokemon? Yes(1) or No(0)")
+            print (f"{f"Health: {hp_calc(poke_dict[starters[choice - 1]])}":<20}{f"Speed: {stat_calc(poke_dict[starters[choice - 1]], "spd")}":>39}")
+            print (f"{f"Attack: {stat_calc(poke_dict[starters[choice - 1]], "atk")}":<20}{f"Defense: {stat_calc(poke_dict[starters[choice - 1]], "def")}":>39}")
+            print (f"{f"Special Attack: {stat_calc(poke_dict[starters[choice - 1]], "spatk")}":<20}{f"Special Defense: {stat_calc(poke_dict[starters[choice - 1]], "spdef")}":>39}")
+            print ("Are you sure you want to pick this Pokemon? Yes(1) or No(0)")
             confirm = input("")
     pokemon = deepcopy(poke_dict[starters[choice - 1]])
-    pokemon["lvl"] += 1
     pokemon["Health"] = hp_calc(pokemon)
     party = [pokemon["Name"]]
 #short intro
@@ -266,7 +266,7 @@ def item_cost(item, shop_cata):
     return randint(shop_cata[item]["Cost"]-1, shop_cata[item]["Cost"]+1)
 #sets up player hp and enemy hp and makes global
 def setup():
-    global plhp, coins, permenatk, permplatk, permendef, permpldef, pokemon_caught, pokemon_killed, xp
+    global plhp, coins, permenatk, permplatk, permendef, permpldef, pokemon_caught, pokemon_killed, xp, critcount
     #resets all stats
     permplatk = 0
     permenatk = 0
@@ -274,6 +274,7 @@ def setup():
     permendef = 0
     coins = 75
     xp = 0
+    critcount = 0
     #draws from dictionary
     plhp = pokemon["Health"]
     pokemon_killed = 0
@@ -285,7 +286,12 @@ def level_up():
     pokemon["lvl"]+=1
     pokemon["Health"] = hp_calc(pokemon)
     printsleep (f"You leveled up! Your level is now {pokemon["lvl"]}!", s)
-    printsleep (f"Your max HP is now {pokemon["Health"]}!", s)
+    printsleep (f"Your Pokemon's max HP is now {pokemon["Health"]}!", s*.5)
+    printsleep (f"Your Pokemon's Attack is now {stat_calc(pokemon, "atk")}!", s*.5)
+    printsleep (f"Your Pokemon's Defense is now {stat_calc(pokemon, "def")}!", s*.5)
+    printsleep (f"Your Pokemon's Special Attack is now {stat_calc(pokemon, "spatk")}!", s*.5)
+    printsleep (f"Your Pokemon's Special Defense is now {stat_calc(pokemon, "spdef")}!", s*.5)
+    printsleep (f"Your Pokemon's Speed is now {stat_calc(pokemon, "spd")}!", s)
 #randomizes and enemy between the available pokemon and prints a small message
 def encounter():
     global enemy, enhp, fights_won
@@ -298,42 +304,67 @@ def encounter():
     #sets enemy health
     enemy["Health"] = hp_calc(enemy)
     enhp = enemy["Health"]
+#calculates stats based on level and base stats
+def stat_calc(poke, stat):
+    return floor(((2 * poke[stat] + 31) * poke["lvl"]) / 100) + 5
 def battle():
     #lets player choose between attacking or entering bag
     def player_turn():
-        #prints headers
-        print (f"Turn: {turn}     Health: {plhp}     Enemy Health: {enhp}")
-        #gives options
-        print ("Attack (1)\nItems (2)")
-        choice = int(input(""))
-        #if player enters an incorrect option
-        if choice >2 or choice < 1:
-            print ("That is not an option. You took too long and missed your turn.")
-        elif choice == 1:
-            attack()
-        else:
-            open_bag()
-    #opens bag
-    def open_bag():
-        #used to keep track of amount of different items. Not needed rn but maybe later
-        item_num = 0
-        #prints out all items
-        for item in bag:
-            print (f"{bag[item]["Name"]} x{bag[item]["Amount"]} ({item_num+1})")
-            item_num+=1
-        #shows player how to go back
-        print (f"Back (0)")
-        #takes input
-        choice = int(input(""))
-        if choice == 0:
-            player_turn()
-        #ends turn if answer isn't accepted
-        elif choice >item_num or choice < 1:
-            print ("You couldn't find the item you were looking for.")
-        elif bag[choice]["Amount"] == 0:
-            print ("You couldn't find the item you were looking for.")
-        else:
-            use_item(choice)
+        doneTurn = False
+        while doneTurn == False:
+            #prints headers
+            print (f"Turn: {turn}     Health: {plhp}     Enemy Health: {enhp}")
+            #gives options
+            print ("Attack (1)\nItems (2)")
+            choice = int(input(""))
+            #if player enters an incorrect option
+            if choice >2 or choice < 1:
+                print ("That is not an option. You took too long and missed your turn.")
+                doneTurn = True
+                return 0, 0
+            #if player chooses attack
+            elif choice == 1:
+                for move in range(1,len(pokemon["Move"])):
+                    if move != "":
+                        print (f"{pokemon["Move"][move]} ({move})")
+                print (f"Back (0)")
+                choice = int(input(""))
+                if choice != 0 and choice >len(pokemon["Move"])-1 or choice < 0:
+                    print (f"Your {pokemon["Name"]} didn't understand your command.")
+                    choice = 0
+                    doneTurn = True
+                    return 0, 0
+                elif choice == 0:
+                    doneTurn = doneTurn
+                else:
+                    doneTurn = True
+                    return "attack", choice
+            #if player chooses bag
+            else:
+                #used to keep track of amount of different items. Not needed rn but maybe later
+                item_num = 0
+                #prints out all items
+                for item in bag:
+                    print (f"{bag[item]["Name"]} x{bag[item]["Amount"]} ({item_num+1})")
+                    item_num+=1
+                #shows player how to go back
+                print (f"Back (0)")
+                #takes input
+                choice = int(input(""))
+                if choice == 0:
+                    doneTurn = doneTurn
+                #ends turn if answer isn't accepted
+                elif choice >item_num or choice < 1:
+                    print ("You couldn't find the item you were looking for.")
+                    doneTurn = True
+                    return 0, 0
+                elif bag[choice]["Amount"] == 0:
+                    print ("You couldn't find the item you were looking for.")
+                    doneTurn = True
+                    return 0, 0
+                else:
+                    doneTurn = True
+                    return "item", choice
     #uses an item
     def use_item(item):
         if bag[item]["Name"] == "Potion":
@@ -393,11 +424,11 @@ def battle():
         if catch_num >= enhp*.9:
             printsleep ("...", s*1.5)
             enhp = "Caught"
-            print ("Catch Successful!")
+            printsleep ("Catch Successful!",s)
             pokemon_caught +=1
             party.append(enemy["Name"])
         else:
-            print ("Catch Failed...")
+            printsleep ("Catch Failed...",s)
     #calculates heal
     def heal(poke, health, amount):
         #calculates heal
@@ -432,11 +463,11 @@ def battle():
             crit = crit_calc()
             lvl = poke["lvl"]
             if move_dict[attack]["MoveType"] == "Phys":
-                raw_atk = floor(((2 * poke["atk"] + 31) * lvl) / 100) + 5
-                raw_def = floor(((2 * opppoke["def"] + 31) * lvl) / 100) + 5
+                raw_atk = stat_calc(poke, "atk")
+                raw_def = stat_calc(poke, "def")
             elif move_dict[attack]["MoveType"] == "Spec":
-                raw_atk = floor(((2 * poke["spatk"] + 31) * lvl) / 100) + 5
-                raw_def = floor(((2 * opppoke["spdef"] + 31) * lvl) / 100) + 5
+                raw_atk = stat_calc(poke, "spatk")
+                raw_def = stat_calc(poke, "spdef")
             modAtk = floor(raw_atk * stg_to_mod(pokeatk))
             modDef = floor(raw_def * stg_to_mod(oppdef))
             modifier = Type * STAB(attack, poke) * random/100 * crit
@@ -445,7 +476,31 @@ def battle():
             C = floor(B/50)+2
             final = floor(C * modifier)
             return max(1, final), crit
-
+    #damage calc without randomness
+    def damage_calc_no_random(poke, opppoke, attack, pokeatk, oppdef):
+        #translates move in poke dict to move in move dict
+        attack = poke_to_move_dict(poke, attack)
+        #finds damage value of move
+        Type = weakness(attack, opppoke)
+        if Type == 0:
+            return Type, 1
+        else:
+            power = move_dict[attack]["Power"]
+            lvl = poke["lvl"]
+            if move_dict[attack]["MoveType"] == "Phys":
+                raw_atk = stat_calc(poke, "atk")
+                raw_def = stat_calc(poke, "def")
+            elif move_dict[attack]["MoveType"] == "Spec":
+                raw_atk = stat_calc(poke, "spatk")
+                raw_def = stat_calc(poke, "spdef")
+            modAtk = floor(raw_atk * stg_to_mod(pokeatk))
+            modDef = floor(raw_def * stg_to_mod(oppdef))
+            modifier = Type * STAB(attack, poke)
+            A = floor((2*lvl)/5+2)
+            B = floor(A*power*(modAtk/modDef))
+            C = floor(B/50)+2
+            final = floor(C * modifier)
+            return max(1, final)
     #stg to mod
     def stg_to_mod(stg):
         #translates stage of stat (+1) atk for example to modifier (in +1 attack's case, it would be 3/2)
@@ -484,30 +539,20 @@ def battle():
             elif move[2] == "D":
                 stg = mod_effect(ddef, move[3]=="+", int(move[1]))
                 return stg, "d", "d"                       
-    #uses player choice to apply attack.
-    def attack():
-        global enatk, platk, pldef, endef, enhp, pokemon_killed
-        for move in range(1,len(pokemon["Move"])):
-            if move != "":
-                print (f"{pokemon["Move"][move]} ({move})")
-        print (f"Back (0)")
-        choice = int(input(""))
-        if choice != 0 and choice >len(pokemon["Move"])-1 or choice < 0:
-            print (f"Your {pokemon["Name"]} didn't understand your command.")
-            choice = 0
-        elif choice == 0:
-            player_turn()
-        elif move_dict[poke_to_move_dict(pokemon, choice)]["Power"] > 0:
-            damage, crit = damage_calc(pokemon, enemy, choice, platk, endef)
-            global enhp
+    #does the player attack
+    def use_attack(attack):
+        global enatk, platk, pldef, endef, enhp, plhp, pokemon_killed, critcount
+        if move_dict[poke_to_move_dict(pokemon, attack)]["Power"] > 0:
+            damage, crit = damage_calc(pokemon, enemy, attack, platk, endef)
             enhp_prehit = enhp
             enhp -= damage
             enhp = floor(enhp)
-            printsleep (f"Your {pokemon["Name"]} used {pokemon["Move"][choice]}", s)
-            move_effect = weakness(poke_to_move_dict(pokemon, choice), enemy)
+            printsleep (f"Your {pokemon["Name"]} used {pokemon["Move"][attack]}", s)
+            move_effect = weakness(poke_to_move_dict(pokemon, attack), enemy)
             effect_text(move_effect)
             if crit == 1.5:
                 printsleep ("It was a critical hit!", s)
+                critcount += 1
             if enhp > 0:
                 printsleep (f"It did {int(round(damage,0))} damage! The enemy {enemy["Name"]} is now at {int(round(enhp,0))} health!", s)
             else:
@@ -515,10 +560,10 @@ def battle():
                 damage = enhp_prehit
                 pokemon_killed += 1
                 enhp = "Dead"
-        if choice != 0 and len(move_dict[poke_to_move_dict(pokemon, choice)]["Effect"]) == 4 and enhp != "Dead":
-            if move_dict[poke_to_move_dict(pokemon, choice)]["Power"] == 0:
-                printsleep (f"Your {pokemon["Name"]} used {pokemon["Move"][choice]}", s)
-            stg, type, targ = apply_effect(pokemon, choice, platk, pldef, enatk, endef)
+        if attack != 0 and len(move_dict[poke_to_move_dict(pokemon, attack)]["Effect"]) == 4 and enhp != "Dead":
+            if move_dict[poke_to_move_dict(pokemon, attack)]["Power"] == 0:
+                printsleep (f"Your {pokemon["Name"]} used {pokemon["Move"][attack]}", s)
+            stg, type, targ = apply_effect(pokemon, attack, platk, pldef, enatk, endef)
             if type == "a" and targ == "a":
                 platk = stg
                 printsleep (f"Your {pokemon["Name"]}'s attack is now at stage {platk} ({round(stg_to_mod(platk), 2)}x)", s) 
@@ -531,17 +576,37 @@ def battle():
             else:
                 endef = stg
                 printsleep (f"The enemy {enemy["Name"]}'s defense is now at stage {endef} ({round(stg_to_mod(endef),2)}x)", s)
-        if move_dict[poke_to_move_dict(pokemon, choice)]["Effect"].find("Recoil") != -1:
-            global plhp
-            recoil = floor(damage * (int(move_dict[poke_to_move_dict(pokemon, choice)]["Effect"][:2])/100))
+        if move_dict[poke_to_move_dict(pokemon, attack)]["Effect"].find("Recoil") != -1:
+            recoil = floor(damage * (int(move_dict[poke_to_move_dict(pokemon, attack)]["Effect"][:2])/100))
             plhp -= recoil
             print (f"Your {pokemon["Name"]} took {recoil} damage in recoil. It is now at {plhp} HP.")
-    #enemy attack
-    def enemy_attack():
-        global enatk, platk, pldef, endef, plhp, enhp, party
-        if turn == 1 and len(move_dict[poke_to_move_dict(enemy, 1)]["Effect"]) == 4:        
-            printsleep (f"The enemy {enemy["Name"]} used {enemy["Move"][1]}", s)
-            stg, type, targ = apply_effect(enemy, 1, enatk, endef, platk, pldef)
+            if plhp < 1:
+                print (f"Your {pokemon["Name"]} died from the recoil...")
+                plhp = "Dead"
+    #uses enemy attack
+    def use_enemy_attack(attack):
+        global enatk, platk, pldef, endef, enhp, plhp, party
+        if move_dict[poke_to_move_dict(enemy, attack)]["Power"] > 0:
+            damage, crit = damage_calc(enemy, pokemon, attack, platk, endef)
+            plhp_prehit = plhp
+            plhp -= damage
+            plhp = floor(plhp)
+            printsleep (f"The enemy {enemy["Name"]} used {enemy["Move"][attack]}", s)
+            move_effect = weakness(poke_to_move_dict(enemy, attack), pokemon)
+            effect_text(move_effect)
+            if crit == 1.5:
+                printsleep ("It was a critical hit!", s)
+            if plhp > 0:
+                printsleep (f"It did {int(round(damage,0))} damage! Your {pokemon["Name"]} is now at {int(round(plhp,0))} health!", s)
+            else:
+                printsleep (f"You did {int(round(damage,0))} damage! Your {pokemon["Name"]} fainted.", s)
+                del party[0]
+                damage = plhp_prehit
+                plhp = "Dead"
+        if attack != 0 and len(move_dict[poke_to_move_dict(enemy, attack)]["Effect"]) == 4 and plhp != "Dead":
+            if move_dict[poke_to_move_dict(enemy, attack)]["Power"] == 0:
+                printsleep (f"The enemy {enemy["Name"]} used {enemy["Move"][attack]}", s)
+            stg, type, targ = apply_effect(enemy, attack, enatk, endef, platk, pldef)
             if type == "a" and targ == "a":
                 enatk = stg
                 printsleep (f"The enemy {enemy["Name"]}'s attack is now at {enatk} ({round(stg_to_mod(enatk),2)}x)", s) 
@@ -554,54 +619,88 @@ def battle():
             else:
                 pldef = stg
                 printsleep (f"Your {pokemon["Name"]}'s defense is now at stage {pldef} ({round(stg_to_mod(pldef),2)}x)", s)   
+                ##
+        if move_dict[poke_to_move_dict(enemy, attack)]["Effect"].find("Recoil") != -1:
+            recoil = floor(damage * (int(move_dict[poke_to_move_dict(enemy, attack)]["Effect"][:2])/100))
+            plhp -= recoil
+            print (f"The enemy {enemy["Name"]} took {recoil} damage in recoil. It is now at {plhp} HP.")
+            if plhp < 1:
+                print (f"The enemy {enemy["Name"]} died from the recoil...")
+                plhp = "Dead"
+    #enemy attack
+    def enemy_attack():
+        global enatk, platk, pldef, endef, plhp, enhp, party
+        if turn == 1 and len(move_dict[poke_to_move_dict(enemy, 1)]["Effect"]) == 4:    
+            return 1    
         else:
             best_move = 1
             move_damage = 0
             moves = enemy["Move"]
             for move in moves:
                 move_num = moves.index(move)
-                if move_num != 0 and move_dict[poke_to_move_dict(enemy, move_num)]["Power"]>0:
-                    print (move)
-                    dam, crit = damage_calc(enemy, pokemon, move_num, enatk, pldef)
-                    print (move)
+                if move_num != 0 and move_dict[poke_to_move_dict(enemy, move_num)]["Power"]>0:                  
+                    dam = damage_calc_no_random(enemy, pokemon, move_num, enatk, pldef)
                     if dam > move_damage and dam != 0:
                         best_move = move
                         best_move_num = move_num
-                        move_damage = dam
-                        move_crit = crit
-            move_effect = weakness(poke_to_move_dict(enemy, best_move_num), pokemon)
-            damage = move_damage
-            plhp -= damage
-            plhp = floor(plhp)
-            printsleep (f"The enemy {enemy["Name"]} used {best_move}", s)
-            effect_text(move_effect)
-            if move_crit == 1.5:
-                printsleep ("It was a critical hit!", s)
-            if plhp > 0:
-                printsleep (f"It did {int(round(damage,0))} damage! Your {pokemon["Name"]} is now at {int(round(plhp,0))} health!", s)
-            else:
-                printsleep (f"It did {int(round(damage,0))} damage! Your {pokemon["Name"]} fainted.", s)  
-                del party[0] 
-                plhp = "Dead"    
-            if move_dict[poke_to_move_dict(enemy, best_move_num)]["Effect"].find("Recoil") != -1:
-                global enhp
-                recoil = floor(damage * (int(move_dict[poke_to_move_dict(enemy, best_move_num)]["Effect"][:2])/100))
-                enhp -= recoil
-                print (f"The enemy {enemy["Name"]} took {recoil} damage in recoil. It is now at {enhp} HP.")
+            return best_move_num
     #counts turns
     turn = 0
     #while loop so game doesn't end until someone dies
     while enhp != "Dead" and plhp != "Dead" and enhp != "Caught":
         turn += 1
-        player_turn()
-        if enhp != "Dead" and enhp != "Caught":
-            enemy_attack()
+        movetype, move = player_turn()
+        enmove = enemy_attack()
+        if movetype == 0 and move == 0:
+            use_enemy_attack(enmove)
+        else:
+            #sets priority/speed
+            enspd = stat_calc(enemy, "spd")
+            plspd = stat_calc(pokemon, "spd")
+            #makes player go first if they are using an item
+            if movetype == "item":
+                plprio = 10
+            #sets priority to move priority
+            else:
+                plprio = move_dict[poke_to_move_dict(pokemon, move)]["Priority"]
+            #sames enemy attack to move priority
+            enprio = move_dict[poke_to_move_dict(enemy, enmove)]["Priority"]
+            if plprio > enprio:
+                if movetype == "item":
+                    use_item(move)
+                else:
+                    use_attack(move)
+                if enhp != "Dead" and enhp != "Caught" and plhp != "Dead":
+                    use_enemy_attack(enmove)
+            elif plprio < enprio:
+                use_enemy_attack(enmove)            
+                if enhp != "Dead" and enhp != "Caught" and plhp != "Dead":
+                    use_attack(move)        
+            else:
+                if plspd > enspd:
+                        use_attack(move)
+                        if enhp != "Dead" and enhp != "Caught" and plhp != "Dead":
+                            use_enemy_attack(enmove)
+                elif plspd < enspd:
+                        use_enemy_attack(enmove)
+                        if enhp != "Dead" and enhp != "Caught" and plhp != "Dead":
+                            use_attack(move)
+                else:
+                    if randint(1,2) == 1:
+                        use_enemy_attack(enmove)
+                        if enhp != "Dead" and enhp != "Caught" and plhp != "Dead":
+                            use_attack(move)
+                    else:
+                        use_attack(move)
+                        if enhp != "Dead" and enhp != "Caught" and plhp != "Dead":
+                            use_enemy_attack(enmove)
     return turn
 def end_screen():
     global turn, fights_won, pokemon_caught, pokemon_killed, coins, bag
     print (f"Name: {name}\nStarter: {pokemon["Name"]}\nTotal Turns: {turn}")
     print (f"Fights Won: {fights_won}\nPokemon Caught: {pokemon_caught}\nPokemon Killed: {pokemon_killed}")
     print (f"Coins: {coins}\nPotions: {bag[1]["Amount"]}\nPokeballs: {bag[2]["Amount"]}")
+    print (f"Crits: {critcount}")
 create_character()
 game_intro()
 turn = 0
@@ -615,6 +714,7 @@ while plhp != "Dead" and fights_won < 10:
     encounter()
     reset_modifiers()
     turn += battle()
+    level_up()
     if plhp != "Dead":
         fights_won +=1
         xp +=1
