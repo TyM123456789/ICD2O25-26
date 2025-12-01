@@ -5,7 +5,6 @@
 # 4. Change enemy ai abit. some updates to how effects are used for player may have some effect on enemy ai if i change that
 # 5. multiple effects?? (boosts atk but loses def)
 # 6. damaging self for boost -1/4 health for +3 atk
-# 7. move order (needs speed stat)
 # 8. accuracy
 # 9. add more temporary stat boosts (evasion, spatk, spdef). right now, atk/def boosts boost both sp attacks and ph attacks
 #resets attack modifiers for player and enemy
@@ -29,17 +28,17 @@ def printsleep(str, time):
 # dictionary of pokemon
 # call by poke_dict[1]["Name"]
 poke_dict = {
-    1: {"Name": "Charmander", "Type": ["","Fire"], "Health": 0, "Move": ["", "Growl", "Tackle", "Ember"], "lvl": 4, "hp": 39, "atk": 52, "def": 43, "spatk": 60, "spdef": 50, "spd": 65},
-    2: {"Name": "Bulbasaur", "Type": ["","Grass", "Poison"], "Health": 0, "Move": ["", "Growl", "Tackle", "Vine Whip"], "lvl": 4, "hp": 45, "atk": 49, "def": 65, "spatk": 65, "spdef": 45, "spd": 45},
-    3: {"Name": "Squirtle", "Type": ["","Water"], "Health": 0, "Move": ["", "Tail Whip", "Tackle", "Water Gun"], "lvl": 4, "hp": 44, "atk": 48, "def": 65, "spatk": 50, "spdef": 64, "spd": 43},
-    4: {"Name": "Pikachu", "Type": ["","Electric"], "Health": 0, "Move": ["", "Growl", "Quick Attack", "Tail Whip", "Thunder Shock"], "lvl": 4, "hp": 35, "atk": 55, "def": 40, "spatk": 50, "spdef": 50, "spd": 90},
-    5: {"Name": "Mimikyu", "Type": ["","Ghost", "Fairy"], "Health": 0, "Move": ["", "Astonish", "Scratch", "Splash", "Wood Hammer"], "lvl": 4, "hp": 55, "atk": 90, "def": 80, "spatk": 50, "spdef": 105, "spd": 96}, #also has astonish
+    1: {"Name": "Charmander", "Type": ["","Fire"], "Health": 0, "Move": ["", "Growl", "Tackle", "Ember"], "lvl": 5, "hp": 39, "atk": 52, "def": 43, "spatk": 60, "spdef": 50, "spd": 65},
+    2: {"Name": "Bulbasaur", "Type": ["","Grass", "Poison"], "Health": 0, "Move": ["", "Growl", "Tackle", "Vine Whip"], "lvl": 5, "hp": 45, "atk": 49, "def": 65, "spatk": 65, "spdef": 45, "spd": 45},
+    3: {"Name": "Squirtle", "Type": ["","Water"], "Health": 0, "Move": ["", "Tail Whip", "Tackle", "Water Gun"], "lvl": 5, "hp": 44, "atk": 48, "def": 65, "spatk": 50, "spdef": 64, "spd": 43},
+    4: {"Name": "Pikachu", "Type": ["","Electric"], "Health": 0, "Move": ["", "Growl", "Quick Attack", "Tail Whip", "Thunder Shock"], "lvl": 5, "hp": 35, "atk": 55, "def": 40, "spatk": 50, "spdef": 50, "spd": 90},
+    5: {"Name": "Mimikyu", "Type": ["","Ghost", "Fairy"], "Health": 0, "Move": ["", "Astonish", "Scratch", "Splash", "Wood Hammer"], "lvl": 5, "hp": 55, "atk": 90, "def": 80, "spatk": 50, "spdef": 105, "spd": 96}, #also has astonish
     6: {"Name": "A Gun", "Type": ["","Steel"], "Health": 0, "Move": ["", "Shoot Hands", "Shoot Chest", "Load Explosive Ammo", "Shoot Head"], "lvl": 50, "hp": 120, "atk": 160, "def": 120, "spatk": 120, "spdef": 120, "spd": 160},
-    7: {"Name": "Punching Bag", "Type": ["","Fighting"], "Health": 0, "Move": ["", "Brace For Impact"], "lvl": 1, "hp": 180, "atk": 60, "def": 180, "spatk": 60, "spdef": 180, "spd": 1}
+    7: {"Name": "Punching Bag", "Type": ["","Fighting"], "Health": 0, "Move": ["", "Brace For Impact"], "lvl": 50, "hp": 180, "atk": 60, "def": 180, "spatk": 60, "spdef": 180, "spd": 1}
 }
 #list of all possible enemies/starters
 enemies = [1,2,3]
-starters = [1, 2, 6]
+starters = [1, 2, 5]
 #dictionary of moves. 
 #call by move_dict[(move#)]["Name"]    if effect is 4 char, first char is targ, 2nd char is amount, 3rd is stat, last is direction else, numbers are percent, word after is effect
 move_dict = {
@@ -486,7 +485,7 @@ def battle():
         #finds damage value of move
         Type = weakness(attack, opppoke)
         if Type == 0:
-            return Type, 1
+            return Type
         else:
             power = move_dict[attack]["Power"]
             lvl = poke["lvl"]
@@ -575,7 +574,7 @@ def battle():
                 printsleep (f"The enemy {enemy["Name"]}'s attack is now at stage {enatk} ({round(stg_to_mod(enatk),2)}x)", s)
             elif type == "d" and targ == "a":
                 pldef = stg
-                printsleep (f"Your {pokemon["Name"]}'s attack is now at stage {pldef} ({round(stg_to_mod(pldef),2)}x)", s)
+                printsleep (f"Your {pokemon["Name"]}'s defense is now at stage {pldef} ({round(stg_to_mod(pldef),2)}x)", s)
             else:
                 endef = stg
                 printsleep (f"The enemy {enemy["Name"]}'s defense is now at stage {endef} ({round(stg_to_mod(endef),2)}x)", s)
@@ -643,8 +642,8 @@ def battle():
                 move_num = moves.index(move)
                 if move_num != 0 and move_dict[poke_to_move_dict(enemy, move_num)]["Power"]>0:                  
                     dam = damage_calc_no_random(enemy, pokemon, move_num, enatk, pldef)
-                    if dam > move_damage and dam != 0:
-                        best_move = move
+                    print (dam)
+                    if dam != 0 and dam > move_damage:
                         best_move_num = move_num
             return best_move_num
     #counts turns
@@ -720,6 +719,8 @@ while plhp != "Dead" and fights_won < 10:
     if plhp != "Dead":
         fights_won +=1
         xp +=1
-        if fights_won//2 == 0:
-            level_up
+        printsleep (fights_won, 1)
+        if fights_won%2 == 0:
+            level_up()
+            printsleep ("level up", 100)
 end_screen()
