@@ -22,7 +22,7 @@ from time import sleep
 from copy import deepcopy
 from math import floor
 #sets amount of time to sleep between text
-s = 0.5
+s = 0
 def printsleep(str, time):
     print (str)
     sleep(time)
@@ -313,7 +313,10 @@ def battle():
         doneTurn = False
         while doneTurn == False:
             #prints headers
-            print (f"Turn: {turn}     Health: {plhp}     Enemy Health: {enhp}")
+            print (f"Turn: {turn}")
+            print (f"{f"Player {pokemon["Name"]}":<24}{f"Enemy {enemy["Name"]}":>40}")
+            print (f"{f"{plhp}/{hp_calc(pokemon)}":<24}{f"{enhp}/{hp_calc(enemy)}":>40}")
+            print (f"{f"Lv{pokemon["lvl"]}":<24}{f"Lv{enemy["lvl"]}":>40}")
             #gives options
             print ("Attack (1)\nItems (2)")
             choice = int(input(""))
@@ -714,10 +717,9 @@ while plhp != "Dead" and fights_won < 10:
     encounter()
     reset_modifiers()
     turn += battle()
-    level_up()
     if plhp != "Dead":
         fights_won +=1
         xp +=1
-        if xp/(1+pokemon["lvl"]) == 1:
-            level_up()
+        if fights_won//2 == 0:
+            level_up
 end_screen()
