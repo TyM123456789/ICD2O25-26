@@ -284,7 +284,7 @@ def level_up():
     xp = 0
     pokemon["lvl"]+=1
     pokemon["Health"] = hp_calc(pokemon)
-    printsleep (f"You leveled up! Your level is now {pokemon["lvl"]}!", s)
+    printsleep (f"You leveled up! Your Pokemon is now at level {pokemon["lvl"]}!", s)
     printsleep (f"Your Pokemon's max HP is now {pokemon["Health"]}!", s*.5)
     printsleep (f"Your Pokemon's Attack is now {stat_calc(pokemon, "atk")}!", s*.5)
     printsleep (f"Your Pokemon's Defense is now {stat_calc(pokemon, "def")}!", s*.5)
@@ -719,8 +719,6 @@ while plhp != "Dead" and fights_won < 10:
     if plhp != "Dead":
         fights_won +=1
         xp +=1
-        printsleep (fights_won, 1)
         if fights_won%2 == 0:
             level_up()
-            printsleep ("level up", 100)
 end_screen()
