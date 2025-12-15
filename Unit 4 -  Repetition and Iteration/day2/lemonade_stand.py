@@ -45,12 +45,12 @@ def decide_weather():
     return weather
 def choice(day):
     print (f"On day {day}, the cost of lemonade is ${lem_cost:.2f}.")
-    print (f"Assets ${money:.2f}")
+    print (f"Assets: ${money:.2f}")
     glass_cost = money +1
     sign_cost = money+1
     lemonade_cost = -1
-    done_chosing = False
-    while done_chosing == False:
+    done_choosing = False
+    while done_choosing == False:
         while glass_cost > money or glass_cost < 0:
             glasses = int(input("How many glasses of lemonade do you wish to make ? "))
             glass_cost = lem_cost*glasses
@@ -71,7 +71,7 @@ def choice(day):
                 print ("Come on, be reasonable!!! Try again.")  
         ans = input("Would you like to change anything?").lower()
         if ans != "yes":
-            done_chosing = True
+            done_choosing = True
     return glasses, signs, lemonade_cost, (glass_cost+sign_cost)
 def get_customers(weather, signs):
     if weather == "sunny":
@@ -100,7 +100,7 @@ def earnings_report(day, glasses, signs, lemonade_cost, lemonade_sold, earnings,
     print (f"  {lemonade_sold:<4}Glasses Sold")
     print (f"$.{lemonade_cost:<4}Per Glass           Income ${round(earnings,2):.2f}")
     print (f"  {glasses:<4}Glasses Made")
-    print (f"  {signs:<4}Signs Made           Expenses ${round(costs,2):.2f}")
+    print (f"  {signs:<4}Signs Made          Expenses ${round(costs,2):.2f}")
     print (f"              Profit ${round(earnings - costs,2):.2f}")
     print (f"              Assets ${round(assets+(earnings - costs),2):.2f}")
     return assets+(earnings - costs)
@@ -109,24 +109,27 @@ def earnings_report(day, glasses, signs, lemonade_cost, lemonade_sold, earnings,
 x= game_intro()
 while x:
     day +=1
+    weather = decide_weather()
+    sleep(1)
     if day == 2:
         lem_cost=.03
+        print ("Your mom stopped giving you sugar. Lemonade now costs $" + str(lem_cost))
     if day == 5:
         lem_cost=.04
+        print ("Inflation has caused sugar prices to go up. Lemonade now costs $" + str(lem_cost))
     if day == 10:
         lem_cost=.05
-    weather = decide_weather()
+        print ("The apocalypse wiped out global sugar supplies. Lemonade now costs $" + str(lem_cost))
     sleep(1)
     glasses, signs, lemonade_cost, expenses = choice(day)
     customer_amount = get_customers(weather, signs)
     lemonade_sold, earnings = glasses_sold(customer_amount, glasses)
     money = earnings_report(day, glasses, signs, lemonade_cost, lemonade_sold, earnings, expenses, money)
     sleep(1)
-    if money <=0:
+    if money < lem_cost:
         print ("You ran out of money.")
         x=False
-    ans = input("Do you want to stop playing? yes or no ").lower()
-    if ans == "yes": 
-        x=False
-    
-
+    else:
+        ans = input("Do you want to stop playing? yes or no ").lower()
+        if ans == "yes": 
+            x=False
