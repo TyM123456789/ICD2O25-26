@@ -11,7 +11,7 @@ while True:
         z2="0"
     else:
         z=""
-    print (f"{q}:{z2}{y}:{z}{x}")
+    print (f"{q}:{y:0>2}:{x:0>2}")
     x+=1
     if x == 60:
         y+=1

@@ -89,10 +89,9 @@ def glasses_sold(customers, glass_count):
     minmax = random.randint(8,10)
     maxmax = random.randint(13,17)
     for x in range(customers):
-        if x+1 <= glass_count:
-            max = random.randint(minmax,maxmax)
-            if max >= lemonade_cost:
-                sold += 1
+        max = random.randint(minmax,maxmax)
+        if max >= lemonade_cost and sold < glass_count:
+            sold += 1
     return sold, sold*(lemonade_cost/100)
 def earnings_report(day, glasses, signs, lemonade_cost, lemonade_sold, earnings, costs, assets):
     print ("$$ Lemonsville Daily Financial Report $$")
