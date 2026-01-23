@@ -31,6 +31,9 @@ while running:
     p2prevx = player2.x
     p2prevy = player2.y
 
+    p1found = False
+    p2found = False
+
     if (keys[pygame.K_RIGHT]): player1.x +=speed
     if (keys[pygame.K_LEFT]): player1.x -=speed
     if (keys[pygame.K_UP]): player1.y -=speed
@@ -91,6 +94,36 @@ while running:
         player1.y = p1prevy
     if p2ychange:
         player2.y = p2prevy
+
+
+    #prize detection
+    if (player1.x + player1.w == prize.x or player1.x+player1.w == prize.x+1) and (player1.y <= prize.y <= player1.y+player1.h or player1.y <= prize.y+prize.h <= player1.y+player1.h):
+        p1found = True
+    elif (player1.x == prize.x+prize.w or player1.x == prize.x+prize.w-1) and (player1.y <= prize.y <= player1.y+player1.h or player1.y <= prize.y+prize.h <= player1.y+player1.h):
+        p1found = True
+    elif (player1.y + player1.h == prize.y or player1.y+player1.h == prize.y+1) and (player1.x <= prize.x <= player1.x+player1.w or player1.x <= prize.x+prize.w <= player1.x+player1.w):
+        p1found = True
+    elif (player1.y == prize.y+prize.h or player1.y == prize.y+prize.h-1) and (player1.x <= prize.x <= player1.x+player1.w or player1.x <= prize.x+prize.w <= player1.x+player1.w):
+        p1found = True
+    else: p1found = False
+
+    #prize detection
+    if (player2.x + player2.w == prize.x or player2.x+player2.w == prize.x+1) and (player2.y <= prize.y <= player2.y+player2.h or player2.y <= prize.y+prize.h <= player2.y+player2.h):
+        p2found = True
+    elif (player2.x == prize.x+prize.w or player2.x == prize.x+prize.w-1) and (player2.y <= prize.y <= player2.y+player2.h or player2.y <= prize.y+prize.h <= player2.y+player2.h):
+        p2found = True
+    elif (player2.y + player2.h == prize.y or player2.y+player2.h == prize.y+1) and (player2.x <= prize.x <= player2.x+player2.w or player2.x <= prize.x+prize.w <= player2.x+player2.w):
+        p2found = True
+    elif (player2.y == prize.y+prize.h or player2.y == prize.y+prize.h-1) and (player2.x <= prize.x <= player2.x+player2.w or player2.x <= prize.x+prize.w <= player2.x+player2.w):
+        p2found = True
+    else: p2found = False
+
+    if p1found:
+        score1+=1
+        prize = pygame.Rect(random.randint(0,SCREEN_WIDTH-20),random.randint(0,SCREEN_HEIGHT-20),20,20)
+    if p2found:
+        score2+=1
+        prize = pygame.Rect(random.randint(0,SCREEN_WIDTH-20),random.randint(0,SCREEN_HEIGHT-20),20,20)
 
 
     screen.fill(BACKGROUND_COLOR)
