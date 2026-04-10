@@ -10,9 +10,6 @@ FPS = 60
 frames =0
 
 pygame.display.set_caption("My Pygame Application")
-WHITE = (255,255,255)
-RED = (255,0,0)
-
 BACKGROUND_COLOR = (255,255,255) # WHITE
 
 running = True
@@ -21,6 +18,7 @@ while running:
         if event.type == pygame.QUIT:
             running = False
     screen.fill(BACKGROUND_COLOR)
+    screen.blit()
     pygame.display.flip()
     clock.tick(60)
     frames+=1
