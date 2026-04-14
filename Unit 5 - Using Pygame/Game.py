@@ -37,6 +37,7 @@ RED = (255,0,0)
 GREEN = (0,255,0)
 BLUE = (0,0,255)
 ORANGE = (250,150,20)
+GRAY = (130,130,130)
 
 
 #font
@@ -73,10 +74,12 @@ class Player:
         self.moving = False
         self.hit = False
         self.last_hit = 0
+        self.hit_enemies = set()
         self.kb_x = 0
         self.kb_y = 0
         self.hp = 100
         self.harm = RED
+        self.stab_cooldown = 0
 
         self.frame = 0
         self.anim_timer = 0
@@ -85,16 +88,27 @@ class Player:
         self.attack_state = 0
         self.attack_frame = 0
         self.attack_timer = 0
-        self.attack_reset_timer = 0
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not self.attacking:
-            self.attack_state = (self.attack_state % 3) + 1
+            # cycle between slash1 and slash2
+            if self.attack_state == 1:
+                self.attack_state = 2
+            else:
+                self.attack_state = 1
             self.attacking = True
             self.attack_frame = 0
             self.attack_timer = 0
-            self.attack_reset_timer = 0
+            self.hit_enemies = set()
 
+        # Stab
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_LSHIFT and self.stab_cooldown == 0:
+            self.attack_state = 3
+            self.attacking = True
+            self.attack_frame = 0
+            self.attack_timer = 0
+            self.stab_cooldown = 1.5
+            self.hit_enemies = set()
     def update(self, dt, keys):
         # Movement
         self.moving = False
@@ -128,12 +142,8 @@ class Player:
         if abs(self.kb_x) < 0.1: self.kb_x = 0
         if abs(self.kb_y) < 0.1: self.kb_y = 0
 
-        # Attack timer
-        if self.attacking:
-            self.attack_reset_timer += dt
-            if self.attack_reset_timer > 0.6:
-                self.attacking = False
-                self.attack_state = 0
+        if self.stab_cooldown > 0:
+            self.stab_cooldown = max(0, self.stab_cooldown - dt)    
 
         # Body frame
         if not self.on_ground:
@@ -155,10 +165,9 @@ class Player:
             if self.attack_timer >= 0.1:
                 self.attack_timer = 0
                 self.attack_frame += 1
-                #LUNGE ON STAB
                 if self.attack_state == 3:
                     self.kb_x = 10 if self.facing_right else -10
-                    self.kb_y = 1 if not p1.on_ground else 0
+                    self.kb_y = 1 if not self.on_ground else 0
                 #reset
                 if self.attack_frame >= len(anim):
                     self.attack_frame = 0
@@ -182,12 +191,24 @@ class Player:
             idx = 0
         return arms_frames[idx] if self.facing_right else arms_frames_flipped[idx]
 
+    def get_attack_rect(self):
+        if not self.attacking:
+            return None
+        arm_width = 40
+        arm_height = 30
+        if self.facing_right:
+            ax = self.x + (BW * SCALE) - 20  # in front of player to the right
+        else:
+            ax = self.x - arm_width + 20     # in front of player to the left
+        ay = self.y + 20
+        return pygame.Rect(ax, ay, arm_width, arm_height)
+
     def draw(self, surface, camera_x, camera_y):
         offset_x = -12 if not self.facing_right else 0
 
         body = self.get_body()
         arms = self.get_arms()
-        if self.last_hit <2 and self.hit:
+        if self.last_hit <.1 and self.hit:
             harm_body = body.copy()
             harm_arms = arms.copy()
             harm_body.fill((self.harm), special_flags=pygame.BLEND_RGB_MAX)
@@ -205,6 +226,10 @@ class Enemy:
         self.frame = 0
         self.anim_timer = 0
         self.speed = 0
+        self.hp = 50
+        self.hit = False
+        self.last_hit = 0
+        self.harm = WHITE
 
         self.patrol_left = patrol_left
         self.patrol_right = patrol_right
@@ -214,9 +239,20 @@ class Enemy:
         self.decel_frames = [1, 0]  # accel frames in reverse
 
         self.state = "accel"  # accel, walk, decel
+
+    def take_hit(self, damage):
+        self.hp -= damage
+        self.hit = True
+        self.last_hit = 0
     def get_rect(self):
         return pygame.Rect(self.x+40, self.y+3, (EW * SCALE)-70, (EH * SCALE)+5)
     def update(self, dt):
+        #hit timer
+        if self.hit:
+            self.last_hit += dt 
+            if self.last_hit >= 0.5:
+                self.hit = False
+                self.last_hit = 0
         # Pick anim + speed based on state
         if self.state == "accel":
             self.speed = min(self.speed + 0.5, 3)
@@ -265,10 +301,13 @@ class Enemy:
             anim = self.decel_frames
 
         idx = anim[min(self.frame, len(anim) - 1)]
+        img = enemy_frames[idx] if self.facing_right else enemy_frames_flipped[idx]
 
-        #blit the frames normall if facing right. if not, print them flipped.
-        surface.blit(enemy_frames[idx] if self.facing_right else enemy_frames_flipped[idx], 
-                     (self.x - camera_x, self.y - camera_y))
+        if self.hit and self.last_hit < 0.1:
+            img = img.copy()
+            img.fill(self.harm, special_flags=pygame.BLEND_RGB_MAX)
+
+        surface.blit(img, (self.x - camera_x, self.y - camera_y))
 
 
 # --- Setup ---
@@ -280,6 +319,7 @@ running = True
 while running:
     past_x = p1.x
     past_y = p1.y
+    #delta time (converts frames to seconds by showing seconds per frame)
     dt = clock.tick(60) / 1000
     keys = pygame.key.get_pressed()
 
@@ -289,8 +329,6 @@ while running:
         p1.handle_event(event)
 
     p1.update(dt, keys)
-
-
 
     target_x = p1.x - WIDTH // 2
     if p1.x - camera_x < CAM_MARGIN_X:
@@ -302,25 +340,38 @@ while running:
         e.update(dt)
 
     screen.fill((SKY))
-    if p1.last_hit == 40:
+    if p1.last_hit >= .5:
         p1.hit = False
         p1.last_hit = 0
-    if not p1.hit:
+    if p1.hit:
+        p1.last_hit += dt
+    elif p1.kb_x == 0:
         for e in enemies:
-            if p1.get_rect().colliderect(e.get_rect()):
-                p1.hit = True
-                p1.last_hit = 0
-                p1.hp-=10
-                # knock away from enemy
-                if p1.x > e.x:
-                    p1.kb_x = 8   # knocked right
-                else:
-                    p1.kb_x = -8  # knocked left
-                if p1.on_ground:
-                    p1.kb_y = -6      # knocked upward      
-    else:
-        p1.last_hit +=1
-        
+            if e.hp > 0:
+                if p1.get_rect().colliderect(e.get_rect()):
+                    p1.hit = True
+                    p1.last_hit = 0
+                    p1.hp-=10
+                    # knock away from enemy
+                    if p1.x > e.x:
+                        p1.kb_x = 8   # knocked right
+                    else:
+                        p1.kb_x = -8  # knocked left
+                    if p1.on_ground:
+                        p1.kb_y = -6      # knocked upward      
+    #attack hitbox
+    attack_rect = p1.get_attack_rect()
+    #if there was an attack, check for hits
+    if attack_rect:
+        for e in enemies:
+            if e.hp > 0 and id(e) not in p1.hit_enemies:
+                if attack_rect.colliderect(e.get_rect()):
+                    p1.hit_enemies.add(id(e))
+                    if p1.attack_state == 3:
+                        e.take_hit(20)
+                    else:
+                        e.take_hit(10)
+            
     #calculates speed
     speed_x = max(p1.x - past_x, past_x - p1.x)
     speed_y = max(p1.y - past_y, past_y - p1.y)
@@ -328,28 +379,30 @@ while running:
     
     # draws player and enemies
     for e in enemies:
-        e.draw(screen, camera_x, camera_y)
-        pygame.draw.rect(screen, (255, 0, 0), e.get_rect().move(-camera_x, -camera_y), 2)
+        if e.hp > 0:
+            e.draw(screen, camera_x, camera_y)
+            pygame.draw.rect(screen, (255, 0, 0), e.get_rect().move(-camera_x, -camera_y), 2)
     pygame.draw.rect(screen, (255, 0, 0), p1.get_rect().move(-camera_x, -camera_y), 2)
-    
     p1.draw(screen, camera_x, camera_y)
-
-    #healthbar (all me)
-    pygame.draw.rect(screen, (0, 255, 0), pygame.Rect(30,30,5*p1.hp,50))
-    pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(30,30,5*p1.hp,50),5)
+    if attack_rect:
+        pygame.draw.rect(screen, (0, 255, 255), attack_rect.move(-camera_x, -camera_y), 2)
 
     pygame.draw.rect(screen, (0,0,0), pygame.Rect(0,GROUND - camera_y+128,WIDTH,200))
 
     #prints text
-    camera = my_font.render(f'camera x = {int(camera_x)} camera y = {int(camera_y)}', False, (0, 0, 0))
-    screen.blit(camera, (30,120))
-    speed = my_font.render(f'speed x = {int(speed_x)} speed y = {int(speed_y)} max x speed = {int(p1.max_xspeed)}', False, (0, 0, 0))
-    screen.blit(speed, (30,180))
+    # camera = my_font.render(f'camera x = {int(camera_x)} camera y = {int(camera_y)}', False, (0, 0, 0))
+    # screen.blit(camera, (30,120))
+    # speed = my_font.render(f'speed x = {int(speed_x)} speed y = {int(speed_y)} max x speed = {int(p1.max_xspeed)}', False, (0, 0, 0))
+    # screen.blit(speed, (30,180))
+    cooldown = my_font.render(f'lunge cooldown: {p1.stab_cooldown:.1f}', False, (0, 0, 0))
+    screen.blit(cooldown, (30,80))
+    hp = my_font.render(f'{p1.hp}', False, (0, 0, 0))
 
     #healthbar (all me)
+    pygame.draw.rect(screen, GRAY, pygame.Rect(30,30,500,50))
     pygame.draw.rect(screen, GREEN if p1.hp > 60  else ORANGE if p1.hp > 30 else RED, pygame.Rect(30,30,5*p1.hp,50))
-    pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(30,30,5*p1.hp,50),5)
-
+    pygame.draw.rect(screen, BLACK, pygame.Rect(30,30,500,50),5)
+    screen.blit(hp, (40,33))
     pygame.display.flip()
     if p1.hp <=0:
         break
