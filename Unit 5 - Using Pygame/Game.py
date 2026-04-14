@@ -22,28 +22,61 @@ AW = arms_sheet.get_width() // ARM_FRAMES
 AH = arms_sheet.get_height()
 EW = enemy_sheet.get_width() // ENEMY_FRAMES
 EH = enemy_sheet.get_height()
+
+#set up camera
+camera_x = 0
+camera_y=0
+CAM_MARGIN_X = 150
+CAM_MARGIN_Y = 150
+
+#colors
+WHITE = (255,255,255)
+SKY = (0, 200, 255)
+BLACK = (0,0,0)
+RED = (255,0,0)
+GREEN = (0,255,0)
+BLUE = (0,0,255)
+ORANGE = (250,150,20)
+
+
+#font
+pygame.font.init()
+my_font = pygame.font.SysFont('Comic Sans MS', 30)
+
+#sets up frames
 enemy_sheet.set_colorkey((0, 0, 0))
-print(f"sheet width: {enemy_sheet.get_width()}, EW: {EW}, EH: {EH}")
 body_frames = [pygame.transform.scale(body_sheet.subsurface((i*BW,0,BW,BH)), (BW*SCALE,BH*SCALE)) for i in range(BODY_FRAMES)]
 arms_frames = [pygame.transform.scale(arms_sheet.subsurface((i*AW,0,AW,AH)), (AW*SCALE,AH*SCALE)) for i in range(ARM_FRAMES)]
 enemy_frames = [pygame.transform.scale(enemy_sheet.subsurface((i*EW,0,EW,EH)), (AW*SCALE,AH*SCALE)) for i in range(ENEMY_FRAMES)]
+
+#flipped frames
+body_frames_flipped = [pygame.transform.flip(f, True, False) for f in body_frames]
+arms_frames_flipped = [pygame.transform.flip(f, True, False) for f in arms_frames]
+enemy_frames_flipped = [pygame.transform.flip(f, True, False) for f in enemy_frames]
 
 # Attack animation indices
 slash1 = [11, 12, 13]
 slash2 = [14, 15]
 stab   = [8, 9, 10]
 
-GROUND = HEIGHT - (BH * SCALE) - 20
+GROUND = HEIGHT - (BH * SCALE) - 150
 
 
 class Player:
     def __init__(self): #__init__ means initialize self is the characyer
         self.x, self.y = WIDTH // 2, GROUND
         self.speed = 4
+        self.max_xspeed = 0
         self.facing_right = True
         self.y_vel = 0
         self.on_ground = True
         self.moving = False
+        self.hit = False
+        self.last_hit = 0
+        self.kb_x = 0
+        self.kb_y = 0
+        self.hp = 100
+        self.harm = RED
 
         self.frame = 0
         self.anim_timer = 0
@@ -76,7 +109,7 @@ class Player:
 
         # Jump
         if keys[pygame.K_SPACE] and self.on_ground:
-            self.y_vel = -10
+            self.y_vel = -13.5
             self.on_ground = False
 
         # Gravity
@@ -86,6 +119,14 @@ class Player:
             self.y = GROUND
             self.y_vel = 0
             self.on_ground = True
+
+        # Knockback
+        self.x += self.kb_x
+        self.y += self.kb_y
+        self.kb_x *= .8  # friction, lower = slides further
+        self.kb_y *= .9
+        if abs(self.kb_x) < 0.1: self.kb_x = 0
+        if abs(self.kb_y) < 0.1: self.kb_y = 0
 
         # Attack timer
         if self.attacking:
@@ -114,13 +155,20 @@ class Player:
             if self.attack_timer >= 0.1:
                 self.attack_timer = 0
                 self.attack_frame += 1
+                #LUNGE ON STAB
+                if self.attack_state == 3:
+                    self.kb_x = 10 if self.facing_right else -10
+                    self.kb_y = 1 if not p1.on_ground else 0
+                #reset
                 if self.attack_frame >= len(anim):
                     self.attack_frame = 0
                     self.attacking = False
 
+    def get_rect(self):
+        return pygame.Rect(self.x+40, self.y, (BW * SCALE)-80, BH * SCALE)
+
     def get_body(self):
-        img = body_frames[self.frame]
-        return pygame.transform.flip(img, True, False) if not self.facing_right else img
+        return body_frames[self.frame] if self.facing_right else body_frames_flipped[self.frame]
 
     def get_arms(self):
         if self.attacking:
@@ -132,17 +180,27 @@ class Player:
             idx = self.frame % 8
         else:
             idx = 0
-        img = arms_frames[idx]
-        return pygame.transform.flip(img, True, False) if not self.facing_right else img
+        return arms_frames[idx] if self.facing_right else arms_frames_flipped[idx]
 
-    def draw(self, surface):
+    def draw(self, surface, camera_x, camera_y):
         offset_x = -12 if not self.facing_right else 0
-        surface.blit(self.get_body(), (self.x, self.y))
-        surface.blit(self.get_arms(), (self.x + offset_x, self.y - 10))
+
+        body = self.get_body()
+        arms = self.get_arms()
+        if self.last_hit <2 and self.hit:
+            harm_body = body.copy()
+            harm_arms = arms.copy()
+            harm_body.fill((self.harm), special_flags=pygame.BLEND_RGB_MAX)
+            harm_arms.fill((self.harm), special_flags=pygame.BLEND_RGB_MAX)
+            surface.blit(harm_body, (self.x - camera_x, self.y - camera_y))
+            surface.blit(harm_arms, (self.x - camera_x + offset_x, self.y - 10 - camera_y))            
+        else:   
+            surface.blit(body, (self.x - camera_x, self.y - camera_y))
+            surface.blit(arms, (self.x - camera_x + offset_x, self.y - 10 - camera_y))
 
 class Enemy:
-    def __init__(self, x, patrol_left=200, patrol_right=500):
-        self.x, self.y = x, GROUND
+    def __init__(self, x, platform, patrol_left=200, patrol_right=500):
+        self.x, self.y = x, platform-5
         self.facing_right = True
         self.frame = 0
         self.anim_timer = 0
@@ -156,7 +214,8 @@ class Enemy:
         self.decel_frames = [1, 0]  # accel frames in reverse
 
         self.state = "accel"  # accel, walk, decel
-
+    def get_rect(self):
+        return pygame.Rect(self.x+40, self.y+3, (EW * SCALE)-70, (EH * SCALE)+5)
     def update(self, dt):
         # Pick anim + speed based on state
         if self.state == "accel":
@@ -187,10 +246,7 @@ class Enemy:
                 self.frame = 0
 
         # Move
-        if self.facing_right:
-            self.x += self.speed
-        else:
-            self.x -= self.speed
+        self.x = self.x + self.speed if self.facing_right else self.x - self.speed
 
         # Animate
         self.anim_timer += 0.067 #67777
@@ -200,7 +256,7 @@ class Enemy:
             if self.frame >= len(anim):
                 self.frame = 0
 
-    def draw(self, surface):
+    def draw(self, surface, camera_x, camera_y):
         if self.state == "accel":
             anim = self.accel_frames
         elif self.state == "walk":
@@ -209,19 +265,21 @@ class Enemy:
             anim = self.decel_frames
 
         idx = anim[min(self.frame, len(anim) - 1)]
-        img = enemy_frames[idx]
-        if not self.facing_right:
-            img = pygame.transform.flip(img, True, False)
-        surface.blit(img, (self.x, self.y))
+
+        #blit the frames normall if facing right. if not, print them flipped.
+        surface.blit(enemy_frames[idx] if self.facing_right else enemy_frames_flipped[idx], 
+                     (self.x - camera_x, self.y - camera_y))
 
 
 # --- Setup ---
 p1 = Player()
-enemies = [Enemy(300, patrol_left=100, patrol_right=600), Enemy(200, patrol_left=0, patrol_right=700)]
+enemies = [Enemy(300, GROUND, patrol_left=100, patrol_right=600), Enemy(200, GROUND, patrol_left=0, patrol_right=700)]
 
 # --- Game loop ---
 running = True
 while running:
+    past_x = p1.x
+    past_y = p1.y
     dt = clock.tick(60) / 1000
     keys = pygame.key.get_pressed()
 
@@ -231,13 +289,69 @@ while running:
         p1.handle_event(event)
 
     p1.update(dt, keys)
+
+
+
+    target_x = p1.x - WIDTH // 2
+    if p1.x - camera_x < CAM_MARGIN_X:
+        camera_x = p1.x - CAM_MARGIN_X
+    elif p1.x - camera_x > WIDTH - CAM_MARGIN_X:
+        camera_x = p1.x - (WIDTH - CAM_MARGIN_X)
+    camera_y = p1.y - HEIGHT // 2
     for e in enemies:
         e.update(dt)
 
-    screen.fill((0, 200, 255))
-    p1.draw(screen)
+    screen.fill((SKY))
+    if p1.last_hit == 40:
+        p1.hit = False
+        p1.last_hit = 0
+    if not p1.hit:
+        for e in enemies:
+            if p1.get_rect().colliderect(e.get_rect()):
+                p1.hit = True
+                p1.last_hit = 0
+                p1.hp-=10
+                # knock away from enemy
+                if p1.x > e.x:
+                    p1.kb_x = 8   # knocked right
+                else:
+                    p1.kb_x = -8  # knocked left
+                if p1.on_ground:
+                    p1.kb_y = -6      # knocked upward      
+    else:
+        p1.last_hit +=1
+        
+    #calculates speed
+    speed_x = max(p1.x - past_x, past_x - p1.x)
+    speed_y = max(p1.y - past_y, past_y - p1.y)
+    p1.max_xspeed = max(speed_x, p1.max_xspeed)
+    
+    # draws player and enemies
     for e in enemies:
-        e.draw(screen)
+        e.draw(screen, camera_x, camera_y)
+        pygame.draw.rect(screen, (255, 0, 0), e.get_rect().move(-camera_x, -camera_y), 2)
+    pygame.draw.rect(screen, (255, 0, 0), p1.get_rect().move(-camera_x, -camera_y), 2)
+    
+    p1.draw(screen, camera_x, camera_y)
+
+    #healthbar (all me)
+    pygame.draw.rect(screen, (0, 255, 0), pygame.Rect(30,30,5*p1.hp,50))
+    pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(30,30,5*p1.hp,50),5)
+
+    pygame.draw.rect(screen, (0,0,0), pygame.Rect(0,GROUND - camera_y+128,WIDTH,200))
+
+    #prints text
+    camera = my_font.render(f'camera x = {int(camera_x)} camera y = {int(camera_y)}', False, (0, 0, 0))
+    screen.blit(camera, (30,120))
+    speed = my_font.render(f'speed x = {int(speed_x)} speed y = {int(speed_y)} max x speed = {int(p1.max_xspeed)}', False, (0, 0, 0))
+    screen.blit(speed, (30,180))
+
+    #healthbar (all me)
+    pygame.draw.rect(screen, GREEN if p1.hp > 60  else ORANGE if p1.hp > 30 else RED, pygame.Rect(30,30,5*p1.hp,50))
+    pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(30,30,5*p1.hp,50),5)
+
     pygame.display.flip()
+    if p1.hp <=0:
+        break
 
 pygame.quit()
