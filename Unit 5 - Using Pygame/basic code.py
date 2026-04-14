@@ -11,7 +11,7 @@ frames =0
 
 pygame.display.set_caption("My Pygame Application")
 BACKGROUND_COLOR = (255,255,255) # WHITE
-
+print("hi")
 running = True
 while running:
     for event in pygame.event.get():
