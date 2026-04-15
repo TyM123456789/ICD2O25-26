@@ -112,6 +112,7 @@ class Player:
         self.hp = 100
         self.harm = RED
         self.stab_cooldown = 0
+        self.gravity = .7
 
         self.frame = 0
         self.anim_timer = 0
@@ -150,65 +151,89 @@ class Player:
             global in_Game
             in_Game = not in_Game
 
+        # Jump Start
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE and self.on_ground:
+                self.y_vel = -20  # Initial jump burst
+                self.on_ground = False
+
+                # Variable Jump: If they let go of Space while moving up
+        if event.type == pygame.KEYUP:
+            if event.key == pygame.K_SPACE:
+                if self.y_vel < -3: # If still moving upward significantly
+                    self.y_vel = -3 # "Cut" the jump velocity
+
     def update(self, dt, keys, tile_rects):
-        # Movement
+        #stab cooldown
+        p1.stab_cooldown -=dt
+        if p1.stab_cooldown < .07:
+            p1.stab_cooldown = 0
+        # --- 1. Horizontal Movement & Collision ---
         self.moving = False
-        if keys[pygame.K_a] and not keys[pygame.K_d]:
-            self.x -= self.speed
+        dx = 0
+        if keys[pygame.K_a]:
+            dx -= self.speed
             self.facing_right = False
             self.moving = True
-        if keys[pygame.K_d] and not keys[pygame.K_a]:
-            self.x += self.speed
+        if keys[pygame.K_d]:
+            dx += self.speed
             self.facing_right = True
             self.moving = True
-        # Jump
-        if keys[pygame.K_SPACE] and self.on_ground:
-            self.y_vel = -13.5
-            self.on_ground = False
 
-        # Gravity
-        self.y_vel += 0.5
-        self.y += self.y_vel
-
-        # Assume in air, will correct if collision happens
-        grounded = False
-
+        # Apply X movement (including knockback)
+        self.x += dx + self.kb_x
+            
+        # Check X collisions immediately
         player_rect = self.get_rect()
+        for tile_rect in tile_rects:
+            if player_rect.colliderect(tile_rect):
+                if (dx + self.kb_x) > 0: # Moving Right
+                    self.x = tile_rect.left - (BW - 40) * SCALE - 40
+                elif (dx + self.kb_x) < 0: # Moving Left
+                    self.x = tile_rect.right - 40
+                self.kb_x = 0 # Stop horizontal momentum on wall hit
+
+        # --- 2. Vertical Movement & Collision ---
+        self.y_vel += self.gravity
+        self.y += self.y_vel + self.kb_y
+            
+        # CRITICAL: Assume we are in the air until proven otherwise
+        self.on_ground = False 
+
+        # Re-check rect after X is settled
+        player_rect = self.get_rect() 
 
         for tile_rect in tile_rects:
             if player_rect.colliderect(tile_rect):
-                if self.y_vel > 0:  # falling
+                if (self.y_vel + self.kb_y) > 0:  # Falling Down
                     self.y = tile_rect.top - (BH * SCALE)
                     self.y_vel = 0
-                    self.on_ground = True
-                    player_rect = self.get_rect()  # ✅ update rect AFTER fixing position
-                    
-                elif self.y_vel < 0:  # ceiling
+                    self.kb_y = 0
+                    self.on_ground = True # Found the floor!
+                elif (self.y_vel + self.kb_y) < 0:  # Hitting Ceiling
                     self.y = tile_rect.bottom
                     self.y_vel = 0
-                    player_rect = self.get_rect()
-        
-
-        if abs(self.y_vel) < 0.1:
-            self.y_vel = 0
-
-        # Knockback
-        self.x += self.kb_x
-        self.y += self.kb_y
-        self.kb_x *= .8  # friction, lower = slides further
-        self.kb_y *= .9
-        if abs(self.kb_x) < 0.1: self.kb_x = 0
-        if abs(self.kb_y) < 0.1: self.kb_y = 0
-
-        if self.stab_cooldown > 0:
-            self.stab_cooldown = max(0, self.stab_cooldown - dt)    
-
-        # Body frame
+                    self.kb_y = 0
         if not self.on_ground:
-            self.frame = 9
+            foot_check_rect = self.get_rect()
+            foot_check_rect.y += 1 
+            for tile_rect in tile_rects:
+                if foot_check_rect.colliderect(tile_rect):
+                    self.on_ground = True
+                    break   
+
+        # --- 3. Friction & Animation ---
+        self.kb_x *= 0.8
+        self.kb_y *= 0.9
+        if self.kb_x < .1 and self.kb_x > 0 or self.kb_x > -.1 and self.kb_x < 0:
+            self.kb_x = 0
+        if self.kb_y < .1 and self.kb_y > 0 or self.kb_y > -.1 and self.kb_y < 0:
+            self.kb_y = 0
+            
+        # Animation selection
+        if not self.on_ground:
+            self.frame = 9 # Falling frame
         elif self.moving:
-            if self.frame in (0, 9):
-                self.frame = 1
             self.anim_timer += 0.15
             if self.anim_timer >= 1:
                 self.anim_timer = 0
@@ -231,7 +256,7 @@ class Player:
                     self.attack_frame = 0
                     self.attacking = False
     def get_rect(self):
-        return pygame.Rect(self.x+40, self.y, (BW * SCALE)-80, BH * SCALE)
+        return pygame.Rect(self.x+40, self.y, (BW -40)* SCALE, BH * SCALE)
 
     def get_body(self):
         return body_frames[self.frame] if self.facing_right else body_frames_flipped[self.frame]
@@ -379,11 +404,6 @@ in_Game = True
 tile_rects = get_tile_rects(grid)
 
 while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            in_Game = not in_Game
     if in_Game:
         past_x = p1.x
         past_y = p1.y
@@ -459,7 +479,7 @@ while running:
         pygame.draw.rect(screen, (0, 255, 255), attack_rect.move(-camera_x, -camera_y), 2)
 
     #prints text
-    cooldown = my_font.render(f'lunge cooldown: {p1.stab_cooldown:.1f}', False, (0, 0, 0))
+    cooldown = my_font.render(f'lunge cooldown: {p1.stab_cooldown:.1f} {p1.y_vel}', False, (0, 0, 0))
     screen.blit(cooldown, (30,80))
     hp = my_font.render(f'{p1.hp}', False, (0, 0, 0))
     pause = pause_font.render(f'PAUSED', True, (0, 0, 0))
