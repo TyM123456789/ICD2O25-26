@@ -1,10 +1,21 @@
-import pygame, random
+import pygame, random, math
 pygame.init()
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 pygame.display.set_caption("Character Demo")
-
+#setup sound
+pygame.mixer.init()
+jump = [pygame.mixer.Sound("jump.wav"), pygame.mixer.Sound("jump2.wav")]
+hit_s = [pygame.mixer.Sound("hit1.wav"), pygame.mixer.Sound("hit2.wav")]
+pause_s = [pygame.mixer.Sound("pause sound.wav"), pygame.mixer.Sound("pause2.wav")]
+die_s = [pygame.mixer.Sound("die.wav"),pygame.mixer.Sound("die2.wav"), pygame.mixer.Sound("die3.wav")]
+footstep_s = [pygame.mixer.Sound("footstep 1.wav")]
+for sound in footstep_s:
+    sound.set_volume(.04)
+player_hit_s = []
+slash_s = []
+playing = False
 # --- Load assets ---
 body_sheet = pygame.image.load("Walking.png").convert_alpha()
 arms_sheet = pygame.image.load("arms.png").convert_alpha()
@@ -68,7 +79,7 @@ with open("map.tile") as f:
     for line in f:
         row = [int(ch) for ch in line.strip()]
         grid.append(row)
-TILE = 64
+TILE = 32 * SCALE
 GROUND = (len(grid) - 1) * TILE - (BH * SCALE)
 BG = pygame.transform.scale(pygame.image.load("background_game.png"), (800*4, 600*4))
 
@@ -99,11 +110,29 @@ def get_tile_rects(grid):
                 rects.append(pygame.Rect(col_i * TILE, row_i * TILE, TILE, TILE))
     return rects
 
+def play_sound(type):
+    global playing
+    if type == "die":
+        die_s[random.randint(0, len(die_s) -1)].play()
+    if type == "enemy hit":
+        hit_s[random.randint(0, len(hit_s) -1)].play()
+    # if type == "player hit":
+    #     player_hit_s[random.randint(0, len(player_hit_s) -1)].play()
+    if type == "pause_s":
+        pause_s[random.randint(0, len(pause_s) -1)].play()
+    if type == "jump":
+        jump[random.randint(0, len(jump) -1)].play()
+    if type =="footstep" and not playing:
+        playing = True
+        footstep_s[random.randint(0, len(footstep_s) -1)].play()
+        playing = False
+    # if type == "slash":
+    #     slash_s[random.randint(0, len(slash_s) -1)].play()
 class Player:
     def __init__(self): #__init__ means initialize self is the characyer
         self.x, self.y = WIDTH // 2, GROUND
         self.speed = 4
-        self.max_xspeed = 0
+        self.max_speed = 0
         self.facing_right = True
         self.y_vel = 0
         self.on_ground = True
@@ -113,13 +142,15 @@ class Player:
         self.hit_enemies = set()
         self.kb_x = 0
         self.kb_y = 0
-        self.hp = 100
+        self.max_hp = 100
+        self.hp = self.max_hp
         self.harm = RED
         self.stab_cooldown = 0
         self.gravity = .7
         self.lunge_power = 10
         self.knockback_x=10
         self.knockback_y=7
+        self.jump = -20
 
         self.frame = 0
         self.anim_timer = 0
@@ -131,6 +162,7 @@ class Player:
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not self.attacking:
+            play_sound("slash")
             # cycle between slash1 and slash2
             if self.attack_state == 1:
                 self.attack_state = 2
@@ -156,12 +188,14 @@ class Player:
         
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             global in_Game
+            play_sound("pause_s")
             in_Game = not in_Game
 
         # Jump Start
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE and self.on_ground:
-                self.y_vel = -20  # Initial jump burst
+                play_sound("jump")
+                self.y_vel = p1.jump  # Initial jump burst
                 self.on_ground = False
 
                 # Variable Jump: If they let go of Space while moving up
@@ -179,10 +213,14 @@ class Player:
         self.moving = False
         dx = 0
         if keys[pygame.K_a] and not (self.attacking and self.attack_state == 3 and self.facing_right):
+            if self.frame == 2 or self.frame == 6:
+                play_sound("footstep")
             dx -= self.speed
             self.facing_right = False
             self.moving = True
         if keys[pygame.K_d] and not (self.attacking and self.attack_state == 3 and not self.facing_right):
+            if self.frame == 2 or self.frame == 6:
+                play_sound("footstep")
             dx += self.speed
             self.facing_right = True
             self.moving = True
@@ -263,7 +301,7 @@ class Player:
                     self.attack_frame = 0
                     self.attacking = False
     def get_rect(self):
-        return pygame.Rect(self.x+40, self.y, (BW -40)* SCALE, BH * SCALE)
+        return pygame.Rect(self.x+20*SCALE, self.y, (BW -40)* SCALE, BH * SCALE)
 
     def get_body(self):
         return body_frames[self.frame] if self.facing_right else body_frames_flipped[self.frame]
@@ -283,13 +321,14 @@ class Player:
     def get_attack_rect(self):
         if not self.attacking:
             return None
-        arm_width = 80 if self.attack_state == 3 else 50
-        arm_height = 30 if self.attack_state == 3 else 60
+        body_width = (BW -40)* SCALE
+        arm_width = 40*SCALE if self.attack_state == 3 else 25*SCALE
+        arm_height = 15*SCALE if self.attack_state == 3 else 30*SCALE
         if self.facing_right:
-            ax = self.x + (BW * SCALE) - 60  # in front of player to the right
+            ax = self.x + body_width*1.5 # in front of player to the right
         else:
-            ax = self.x - arm_width + 60     # in front of player to the left
-        ay = self.y + 20
+            ax = self.x if self.attack_state != 3 else self.x - 10*SCALE     # in front of player to the left
+        ay = self.y + 10 * SCALE if self.attack_state != 3 else self.y + 20*SCALE
         return pygame.Rect(ax, ay, arm_width, arm_height)
 
     def draw(self, surface, camera_x, camera_y):
@@ -331,6 +370,10 @@ class Enemy:
 
     def take_hit(self, damage):
         self.hp -= damage
+        if self.hp > 0:
+            play_sound("enemy hit")
+        else:
+            play_sound("die")
         self.hit = True
         self.last_hit = 0
     def get_rect(self):
@@ -451,6 +494,7 @@ while running:
             for e in enemies:
                 if e.hp > 0:
                     if p1.get_rect().colliderect(e.get_rect()):
+                        play_sound("player hit")
                         p1.hit = True
                         p1.last_hit = 0
                         p1.hp-=10
@@ -475,14 +519,17 @@ while running:
                             e.take_hit(10)
                 
         #calculates speed
-        speed_x = abs(p1.x - past_x)
-        speed_y = abs(p1.y - past_y)
-        p1.max_xspeed = max(speed_x, p1.max_xspeed)
+        p1.max_speed = 0 if p1.max_speed == 128 else p1.max_speed
+        p1.speed_x = abs(p1.x - past_x)
+        p1.speed_y = abs(p1.y - past_y)
+        p1.tot_speed = math.sqrt(p1.speed_x**2 + p1.speed_y**2)
+        p1.max_speed = max(p1.max_speed, p1.tot_speed)
     else:
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 p1.handle_event(event)        
-
+            if event.type == pygame.QUIT:
+                running = False
 
     # draws player and enemies
     for e in enemies:
@@ -497,15 +544,15 @@ while running:
         pygame.draw.rect(screen, CYAN, attack_rect.move(-camera_x, -camera_y), 2) if p1.attack_state != 3 else pygame.draw.rect(screen, GREEN, attack_rect.move(-camera_x, -camera_y), 2)
 
     #prints text
-    cooldown = my_font.render(f'lunge cooldown: {p1.stab_cooldown:.1f} {dt*60}', False, BLACK)
+    cooldown = my_font.render(f'lunge cooldown: {p1.stab_cooldown:.1f} {p1.max_speed:.2f}', False, BLACK)
     screen.blit(cooldown, (30,80))
     hp = my_font.render(f'{p1.hp}', False, BLACK)
     pause = pause_font.render(f'PAUSED', True, BLACK)
 
     #healthbar (all me)
-    pygame.draw.rect(screen, GRAY, pygame.Rect(30,30,500,50))
+    pygame.draw.rect(screen, GRAY, pygame.Rect(30,30,5*p1.max_hp,50))
     pygame.draw.rect(screen, GREEN if p1.hp > 60  else ORANGE if p1.hp > 30 else RED, pygame.Rect(30,30,5*p1.hp,50))
-    pygame.draw.rect(screen, BLACK, pygame.Rect(30,30,500,50),5)
+    pygame.draw.rect(screen, BLACK, pygame.Rect(30,30,5*p1.max_hp,50),5)
     screen.blit(hp, (40,33))
     if not in_Game:
         # screen.fill((255, 0, 0, 128))
