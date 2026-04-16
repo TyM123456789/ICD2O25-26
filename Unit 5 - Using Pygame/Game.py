@@ -25,8 +25,7 @@ EH = enemy_sheet.get_height()
 #set up camera
 camera_x = 0
 camera_y=0
-CAM_MARGIN_X = 150
-CAM_MARGIN_Y = 150
+CAM_MARGIN_X = 300
 hitboxes = False
 
 #colors
@@ -38,6 +37,7 @@ GREEN = (0,255,0)
 BLUE = (0,0,255)
 ORANGE = (250,150,20)
 GRAY = (130,130,130)
+CYAN = (0,255,255)
 
 #font
 pygame.font.init()
@@ -70,12 +70,16 @@ with open("map.tile") as f:
         grid.append(row)
 TILE = 64
 GROUND = (len(grid) - 1) * TILE - (BH * SCALE)
+BG = pygame.transform.scale(pygame.image.load("background_game.png"), (800*4, 600*4))
+
 tiles = [
     "",
     pygame.transform.scale(pygame.image.load("blue light tile.png"), (TILE, TILE)),
     pygame.transform.scale(pygame.image.load("blue dark tile.png"), (TILE, TILE))
 ]
-
+# Calculate map dimensions in pixels
+map_width = len(grid[0]) * TILE
+map_height = len(grid) * TILE
 def draw_tiles(surface, grid, camera_x, camera_y):
     x=0
     y=0
@@ -113,6 +117,9 @@ class Player:
         self.harm = RED
         self.stab_cooldown = 0
         self.gravity = .7
+        self.lunge_power = 10
+        self.knockback_x=10
+        self.knockback_y=7
 
         self.frame = 0
         self.anim_timer = 0
@@ -171,11 +178,11 @@ class Player:
         # --- 1. Horizontal Movement & Collision ---
         self.moving = False
         dx = 0
-        if keys[pygame.K_a]:
+        if keys[pygame.K_a] and not (self.attacking and self.attack_state == 3 and self.facing_right):
             dx -= self.speed
             self.facing_right = False
             self.moving = True
-        if keys[pygame.K_d]:
+        if keys[pygame.K_d] and not (self.attacking and self.attack_state == 3 and not self.facing_right):
             dx += self.speed
             self.facing_right = True
             self.moving = True
@@ -249,7 +256,7 @@ class Player:
                 self.attack_timer = 0
                 self.attack_frame += 1
                 if self.attack_state == 3:
-                    self.kb_x = 10 if self.facing_right else -10
+                    self.kb_x = p1.lunge_power if self.facing_right else -p1.lunge_power
                     self.kb_y = 1 if not self.on_ground else 0
                 #reset
                 if self.attack_frame >= len(anim):
@@ -276,12 +283,12 @@ class Player:
     def get_attack_rect(self):
         if not self.attacking:
             return None
-        arm_width = 40
-        arm_height = 30
+        arm_width = 80 if self.attack_state == 3 else 50
+        arm_height = 30 if self.attack_state == 3 else 60
         if self.facing_right:
-            ax = self.x + (BW * SCALE) - 20  # in front of player to the right
+            ax = self.x + (BW * SCALE) - 60  # in front of player to the right
         else:
-            ax = self.x - arm_width + 20     # in front of player to the left
+            ax = self.x - arm_width + 60     # in front of player to the left
         ay = self.y + 20
         return pygame.Rect(ax, ay, arm_width, arm_height)
 
@@ -423,10 +430,16 @@ while running:
         elif p1.x - camera_x > WIDTH - CAM_MARGIN_X:
             camera_x = p1.x - (WIDTH - CAM_MARGIN_X)
         camera_y = p1.y - HEIGHT // 2
+
+        # --- NEW: Clamp Camera to Map Edges ---
+        # Keep X between 0 and (Map Width - Screen Width)
+        camera_x = max(0, min(camera_x, map_width - WIDTH))
+
         for e in enemies:
             e.update(dt)
 
         screen.fill(SKY)
+        # screen.blit(BG, (-.5*camera_x+TILE, -.5*camera_y))
         draw_tiles(screen, grid, camera_x, camera_y)
 
         if p1.last_hit >= .5:
@@ -443,11 +456,11 @@ while running:
                         p1.hp-=10
                         # knock away from enemy
                         if p1.x > e.x:
-                            p1.kb_x = 8   # knocked right
+                            p1.kb_x = p1.knockback_x   # knocked right
                         else:
-                            p1.kb_x = -8  # knocked left
+                            p1.kb_x = -p1.knockback_x  # knocked left
                         if p1.on_ground:
-                            p1.kb_y = -6      # knocked upward      
+                            p1.kb_y = -p1.knockback_y      # knocked upward      
         #attack hitbox
         attack_rect = p1.get_attack_rect()
         #if there was an attack, check for hits
@@ -465,24 +478,29 @@ while running:
         speed_x = abs(p1.x - past_x)
         speed_y = abs(p1.y - past_y)
         p1.max_xspeed = max(speed_x, p1.max_xspeed)
-        
-        # draws player and enemies
+    else:
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                p1.handle_event(event)        
+
+
+    # draws player and enemies
     for e in enemies:
         if e.hp > 0:
             e.draw(screen, camera_x, camera_y)
             if hitboxes:
-                pygame.draw.rect(screen, (255, 0, 0), e.get_rect().move(-camera_x, -camera_y), 2)
+                pygame.draw.rect(screen, RED, e.get_rect().move(-camera_x, -camera_y), 2)
     if hitboxes:
-        pygame.draw.rect(screen, (255, 0, 0), p1.get_rect().move(-camera_x, -camera_y), 2)
+        pygame.draw.rect(screen, RED, p1.get_rect().move(-camera_x, -camera_y), 2)
     p1.draw(screen, camera_x, camera_y)
     if attack_rect and hitboxes:
-        pygame.draw.rect(screen, (0, 255, 255), attack_rect.move(-camera_x, -camera_y), 2)
+        pygame.draw.rect(screen, CYAN, attack_rect.move(-camera_x, -camera_y), 2) if p1.attack_state != 3 else pygame.draw.rect(screen, GREEN, attack_rect.move(-camera_x, -camera_y), 2)
 
     #prints text
-    cooldown = my_font.render(f'lunge cooldown: {p1.stab_cooldown:.1f} {p1.y_vel}', False, (0, 0, 0))
+    cooldown = my_font.render(f'lunge cooldown: {p1.stab_cooldown:.1f} {dt*60}', False, BLACK)
     screen.blit(cooldown, (30,80))
-    hp = my_font.render(f'{p1.hp}', False, (0, 0, 0))
-    pause = pause_font.render(f'PAUSED', True, (0, 0, 0))
+    hp = my_font.render(f'{p1.hp}', False, BLACK)
+    pause = pause_font.render(f'PAUSED', True, BLACK)
 
     #healthbar (all me)
     pygame.draw.rect(screen, GRAY, pygame.Rect(30,30,500,50))
