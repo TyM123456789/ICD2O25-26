@@ -12,8 +12,8 @@ pause_s = [pygame.mixer.Sound("pause sound.wav"), pygame.mixer.Sound("pause2.wav
 die_s = [pygame.mixer.Sound("die.wav"),pygame.mixer.Sound("die2.wav"), pygame.mixer.Sound("die3.wav")]
 footstep_s = [pygame.mixer.Sound("footstep 1.wav")]
 for sound in footstep_s:
-    sound.set_volume(.04)
-player_hit_s = []
+    sound.set_volume(.01)
+player_hit_s = [pygame.mixer.Sound("player hit.wav"), pygame.mixer.Sound("player hit2.wav")]
 slash_s = []
 playing = False
 # --- Load assets ---
@@ -41,7 +41,7 @@ hitboxes = False
 
 #colors
 WHITE = (255,255,255)
-SKY = (0, 200, 255)
+SKY = (1, 183, 238)
 BLACK = (0,0,0)
 RED = (255,0,0)
 GREEN = (0,255,0)
@@ -81,17 +81,17 @@ with open("map.tile") as f:
         grid.append(row)
 TILE = 32 * SCALE
 GROUND = (len(grid) - 1) * TILE - (BH * SCALE)
-BG = pygame.transform.scale(pygame.image.load("background_game.png"), (800*4, 600*4))
+BG = pygame.transform.scale(pygame.image.load("thingy.png"), (800*4, 600*4))
 
 tiles = [
     "",
-    pygame.transform.scale(pygame.image.load("blue light tile.png"), (TILE, TILE)),
-    pygame.transform.scale(pygame.image.load("blue dark tile.png"), (TILE, TILE))
+    pygame.transform.scale(pygame.image.load("blue dark tile.png"), (TILE, TILE)),
+    pygame.transform.scale(pygame.image.load("blue light tile.png"), (TILE, TILE))
 ]
 # Calculate map dimensions in pixels
 map_width = len(grid[0]) * TILE
 map_height = len(grid) * TILE
-def draw_tiles(surface, grid, camera_x, camera_y):
+def draw_tiles(grid, camera_x, camera_y):
     x=0
     y=0
     for row_i, row in enumerate(grid):
@@ -116,16 +116,16 @@ def play_sound(type):
         die_s[random.randint(0, len(die_s) -1)].play()
     if type == "enemy hit":
         hit_s[random.randint(0, len(hit_s) -1)].play()
-    # if type == "player hit":
-    #     player_hit_s[random.randint(0, len(player_hit_s) -1)].play()
+    if type == "player hit":
+        player_hit_s[random.randint(0, len(player_hit_s) -1)].play()
     if type == "pause_s":
         pause_s[random.randint(0, len(pause_s) -1)].play()
     if type == "jump":
         jump[random.randint(0, len(jump) -1)].play()
-    if type =="footstep" and not playing:
-        playing = True
-        footstep_s[random.randint(0, len(footstep_s) -1)].play()
-        playing = False
+    # if type =="footstep" and not playing:
+    #     playing = True
+    #     footstep_s[random.randint(0, len(footstep_s) -1)].play()
+    #     playing = False
     # if type == "slash":
     #     slash_s[random.randint(0, len(slash_s) -1)].play()
 class Player:
@@ -394,7 +394,7 @@ class Enemy:
                 self.frame = 0
 
         elif self.state == "walk":
-            self.speed = 2
+            self.speed = 4
             anim = self.walk_frames
             # Start slowing down when close to boundary
             close_to_edge = (
@@ -443,11 +443,13 @@ class Enemy:
 
 # --- Setup ---
 p1 = Player()
-#Enemy(random.randint(200,800), GROUND, patrol_left=random.randint(-100,200), patrol_right=random.randint(800,1000))
+#this was actually written by me!!
 enemies = [
-    Enemy(300, (len(grid) - 1) * TILE - (EH * SCALE), patrol_left=100, patrol_right=600),
-    Enemy(200, (len(grid) - 1) * TILE - (EH * SCALE), patrol_left=0, patrol_right=700)
+    Enemy(random.randint(int(len(rows)*.4),int(len(rows)*.6))*TILE, (index+2) * TILE - (EH * SCALE), patrol_left=random.randint(int(len(rows)*.1),int(len(rows)*.4))*TILE, patrol_right=random.randint(int(len(rows)*.6),int(len(rows)*.9))*TILE) 
+    for index, rows in enumerate(grid)
+    if "1" in str(rows)
 ]
+
 # --- Game loop ---
 running = True
 in_Game = True
@@ -482,8 +484,10 @@ while running:
             e.update(dt)
 
         screen.fill(SKY)
-        # screen.blit(BG, (-.5*camera_x+TILE, -.5*camera_y))
-        draw_tiles(screen, grid, camera_x, camera_y)
+
+        screen.blit(BG, (0-camera_x*.5,0-camera_y*.5))
+
+        draw_tiles(grid, camera_x, camera_y)
 
         if p1.last_hit >= .5:
             p1.hit = False
