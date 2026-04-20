@@ -71,9 +71,6 @@ slash1 = [11, 12, 13]
 slash2 = [14, 15]
 stab   = [8, 9, 10]
 
-
-pausescreen = pygame.Surface((200, 150), pygame.SRCALPHA)
-
 grid = []
 with open("map.tile") as f:
     for line in f:
@@ -128,6 +125,7 @@ def play_sound(type):
     #     playing = False
     # if type == "slash":
     #     slash_s[random.randint(0, len(slash_s) -1)].play()
+
 class Player:
     def __init__(self): #__init__ means initialize self is the characyer
         self.x, self.y = WIDTH // 2, GROUND
@@ -154,7 +152,12 @@ class Player:
 
         self.frame = 0
         self.anim_timer = 0
+        self.damage_dealt = 0
 
+
+        self.slashes = 0
+        self.stabs = 0
+        self.score = 0
         self.attacking = False
         self.attack_state = 0
         self.attack_frame = 0
@@ -165,8 +168,10 @@ class Player:
             play_sound("slash")
             # cycle between slash1 and slash2
             if self.attack_state == 1:
+                self.slashes +=1
                 self.attack_state = 2
             else:
+                self.slashes+=1
                 self.attack_state = 1
             self.attacking = True
             self.attack_frame = 0
@@ -175,6 +180,7 @@ class Player:
 
         # Stab
         if event.type == pygame.KEYDOWN and event.key == pygame.K_LSHIFT and self.stab_cooldown <= 0.07:
+            self.stabs+=1
             self.attack_state = 3
             self.attacking = True
             self.attack_frame = 0
@@ -187,8 +193,9 @@ class Player:
             hitboxes = not hitboxes
         
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            global in_Game
+            global in_Game, paused
             play_sound("pause_s")
+            paused = not paused
             in_Game = not in_Game
 
         # Jump Start
@@ -290,11 +297,14 @@ class Player:
         if self.attacking:
             anim = [slash1, slash2, stab][self.attack_state - 1]
             self.attack_timer += dt
+            #attack animation speed
             if self.attack_timer >= 0.1:
                 self.attack_timer = 0
                 self.attack_frame += 1
                 if self.attack_state == 3:
+                    #pushes the player in direction their facing
                     self.kb_x = p1.lunge_power if self.facing_right else -p1.lunge_power
+                    #pushing the player up when lunging on the ground helps increase distance but is otherwise unnecessary (this one line was coded by me)
                     self.kb_y = 1 if not self.on_ground else 0
                 #reset
                 if self.attack_frame >= len(anim):
@@ -322,6 +332,7 @@ class Player:
         if not self.attacking:
             return None
         body_width = (BW -40)* SCALE
+        #changes hitboxes if lunging vs if slashing
         arm_width = 40*SCALE if self.attack_state == 3 else 25*SCALE
         arm_height = 15*SCALE if self.attack_state == 3 else 30*SCALE
         if self.facing_right:
@@ -370,9 +381,11 @@ class Enemy:
 
     def take_hit(self, damage):
         self.hp -= damage
+        p1.damage_dealt += damage
         if self.hp > 0:
             play_sound("enemy hit")
         else:
+            p1.score+=1
             play_sound("die")
         self.hit = True
         self.last_hit = 0
@@ -453,6 +466,9 @@ enemies = [
 # --- Game loop ---
 running = True
 in_Game = True
+paused = False
+time = 0
+win_timer = 100000000000
 tile_rects = get_tile_rects(grid)
 
 while running:
@@ -462,6 +478,7 @@ while running:
         
         #delta time (converts frames to seconds by showing seconds per frame)
         dt = clock.tick(60) / 1000
+        time += dt
         keys = pygame.key.get_pressed()
 
         for event in pygame.event.get():
@@ -521,6 +538,15 @@ while running:
                             e.take_hit(20)
                         else:
                             e.take_hit(10)
+
+        if win_timer <= 5:
+            win_timer -= dt
+
+        elif p1.score == len(enemies):
+            WIN = True
+            win_timer = 3
+        else:
+            WIN = False
                 
         #calculates speed
         p1.max_speed = 0 if p1.max_speed == 128 else p1.max_speed
@@ -534,33 +560,50 @@ while running:
                 p1.handle_event(event)        
             if event.type == pygame.QUIT:
                 running = False
+    if (in_Game) or (not in_Game and not WIN):
+        # draws player and enemies
+        for e in enemies:
+            if e.hp > 0:
+                e.draw(screen, camera_x, camera_y)
+                if hitboxes:
+                    pygame.draw.rect(screen, RED, e.get_rect().move(-camera_x, -camera_y), 2)
+        if hitboxes:
+            pygame.draw.rect(screen, RED, p1.get_rect().move(-camera_x, -camera_y), 2)
+        p1.draw(screen, camera_x, camera_y)
+        if attack_rect and hitboxes:
+            pygame.draw.rect(screen, CYAN, attack_rect.move(-camera_x, -camera_y), 2) if p1.attack_state != 3 else pygame.draw.rect(screen, GREEN, attack_rect.move(-camera_x, -camera_y), 2)
 
-    # draws player and enemies
-    for e in enemies:
-        if e.hp > 0:
-            e.draw(screen, camera_x, camera_y)
-            if hitboxes:
-                pygame.draw.rect(screen, RED, e.get_rect().move(-camera_x, -camera_y), 2)
-    if hitboxes:
-        pygame.draw.rect(screen, RED, p1.get_rect().move(-camera_x, -camera_y), 2)
-    p1.draw(screen, camera_x, camera_y)
-    if attack_rect and hitboxes:
-        pygame.draw.rect(screen, CYAN, attack_rect.move(-camera_x, -camera_y), 2) if p1.attack_state != 3 else pygame.draw.rect(screen, GREEN, attack_rect.move(-camera_x, -camera_y), 2)
+        #prints text
+        cooldown = my_font.render(f'lunge cooldown: {p1.stab_cooldown:.1f} {p1.max_speed:.2f}', False, BLACK)
+        screen.blit(cooldown, (30,80))
+        hp = my_font.render(f'{p1.hp}', False, BLACK)
+        score_text = my_font.render(f'score: {p1.score}', False, BLACK)
+        pause = pause_font.render(f'PAUSED', True, BLACK)
+        win_message = pause_font.render(f'YOU WIN!!!', True, BLACK)
 
-    #prints text
-    cooldown = my_font.render(f'lunge cooldown: {p1.stab_cooldown:.1f} {p1.max_speed:.2f}', False, BLACK)
-    screen.blit(cooldown, (30,80))
-    hp = my_font.render(f'{p1.hp}', False, BLACK)
-    pause = pause_font.render(f'PAUSED', True, BLACK)
-
-    #healthbar (all me)
-    pygame.draw.rect(screen, GRAY, pygame.Rect(30,30,5*p1.max_hp,50))
-    pygame.draw.rect(screen, GREEN if p1.hp > 60  else ORANGE if p1.hp > 30 else RED, pygame.Rect(30,30,5*p1.hp,50))
-    pygame.draw.rect(screen, BLACK, pygame.Rect(30,30,5*p1.max_hp,50),5)
-    screen.blit(hp, (40,33))
-    if not in_Game:
-        # screen.fill((255, 0, 0, 128))
-        screen.blit(pause, (250,200))
+        #healthbar (all me)
+        pygame.draw.rect(screen, GRAY, pygame.Rect(30,30,5*p1.max_hp,50))
+        pygame.draw.rect(screen, GREEN if p1.hp > 60  else ORANGE if p1.hp > 30 else RED, pygame.Rect(30,30,5*p1.hp,50))
+        pygame.draw.rect(screen, BLACK, pygame.Rect(30,30,5*p1.max_hp,50),5)
+        screen.blit(hp, (40,33))
+        screen.blit(score_text, (30, 115))
+        if not in_Game and paused:
+            screen.blit(pause, (250,150))
+        elif WIN and win_timer>0:
+            screen.blit(win_message, (220, 233))
+        elif win_timer <= 0.1:
+            in_Game = False
+    else:
+        screen.fill(GRAY)
+        win_message = pause_font.render(f'YOU WIN!!!', True, BLACK)
+        screen.blit(win_message, (200, 100))
+        stats_text = [my_font.render(f'{f'   You finished in {time:.1f} seconds':^40}', True, BLACK), 
+                      my_font.render(f'{f'Damage Taken: {p1.max_hp-p1.hp}':<20}{f'Enemies Killed: {p1.score}':>20}', True, BLACK),  
+                      my_font.render(f'{f'Slashes: {p1.slashes}':<20}{f'Stabs: {p1.stabs}':>29}', True, BLACK),
+                      my_font.render(f'Damage Dealt: {p1.damage_dealt}', True, BLACK)
+                      ]
+        for index, stat in enumerate(stats_text):
+            screen.blit(stat, (150, 200 + (30 * (index+1))))
     pygame.display.flip()
     if p1.hp <=0:
         break
