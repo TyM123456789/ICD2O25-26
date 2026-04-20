@@ -10,11 +10,14 @@ jump = [pygame.mixer.Sound("jump.wav"), pygame.mixer.Sound("jump2.wav")]
 hit_s = [pygame.mixer.Sound("hit1.wav"), pygame.mixer.Sound("hit2.wav")]
 pause_s = [pygame.mixer.Sound("pause sound.wav"), pygame.mixer.Sound("pause2.wav")]
 die_s = [pygame.mixer.Sound("die.wav"),pygame.mixer.Sound("die2.wav"), pygame.mixer.Sound("die3.wav")]
+win_s = [pygame.mixer.Sound("victory drumroll.mp3")]
+#footsteps arent working right now
 footstep_s = [pygame.mixer.Sound("footstep 1.wav")]
 for sound in footstep_s:
     sound.set_volume(.01)
 player_hit_s = [pygame.mixer.Sound("player hit.wav"), pygame.mixer.Sound("player hit2.wav")]
-slash_s = []
+slash_s = [pygame.mixer.Sound("SWORD 1.mp3"), pygame.mixer.Sound("SWORD 3 (non-brutal).mp3")]
+stab_s = [pygame.mixer.Sound("SWORD 2 (brutal).mp3"), pygame.mixer.Sound("SWORD 4 (metal).mp3")]
 playing = False
 # --- Load assets ---
 body_sheet = pygame.image.load("Walking.png").convert_alpha()
@@ -78,13 +81,16 @@ with open("map.tile") as f:
         grid.append(row)
 TILE = 32 * SCALE
 GROUND = (len(grid) - 1) * TILE - (BH * SCALE)
-BG = pygame.transform.scale(pygame.image.load("thingy.png"), (800*4, 600*4))
+BG = pygame.transform.scale(pygame.image.load("backgroundv.2.png"), (800*4, 600*4))
 
 tiles = [
     "",
     pygame.transform.scale(pygame.image.load("blue dark tile.png"), (TILE, TILE)),
     pygame.transform.scale(pygame.image.load("blue light tile.png"), (TILE, TILE))
 ]
+
+wave_timer = -1
+wave_num = 1
 # Calculate map dimensions in pixels
 map_width = len(grid[0]) * TILE
 map_height = len(grid) * TILE
@@ -119,12 +125,16 @@ def play_sound(type):
         pause_s[random.randint(0, len(pause_s) -1)].play()
     if type == "jump":
         jump[random.randint(0, len(jump) -1)].play()
+    # if type == "win":
+    #     win_s[random.randint(0,len(win_s)-1)].play
     # if type =="footstep" and not playing:
     #     playing = True
     #     footstep_s[random.randint(0, len(footstep_s) -1)].play()
     #     playing = False
-    # if type == "slash":
-    #     slash_s[random.randint(0, len(slash_s) -1)].play()
+    if type == "slash":
+        slash_s[random.randint(0, len(slash_s) -1)].play()
+    if type == "stab":
+        stab_s[random.randint(0, len(stab_s) -1)].play()
 
 class Player:
     def __init__(self): #__init__ means initialize self is the characyer
@@ -180,6 +190,7 @@ class Player:
 
         # Stab
         if event.type == pygame.KEYDOWN and event.key == pygame.K_LSHIFT and self.stab_cooldown <= 0.07:
+            play_sound("stab")
             self.stabs+=1
             self.attack_state = 3
             self.attacking = True
@@ -369,6 +380,7 @@ class Enemy:
         self.hit = False
         self.last_hit = 0
         self.harm = WHITE
+        self.dam = 10
 
         self.patrol_left = patrol_left
         self.patrol_right = patrol_right
@@ -464,6 +476,7 @@ enemies = [
 ]
 
 # --- Game loop ---
+WIN = False
 running = True
 in_Game = True
 paused = False
@@ -502,7 +515,7 @@ while running:
 
         screen.fill(SKY)
 
-        screen.blit(BG, (0-camera_x*.5,0-camera_y*.5))
+        screen.blit(BG, (0-camera_x*.5,-250-camera_y*.5))
 
         draw_tiles(grid, camera_x, camera_y)
 
@@ -518,7 +531,7 @@ while running:
                         play_sound("player hit")
                         p1.hit = True
                         p1.last_hit = 0
-                        p1.hp-=10
+                        p1.hp-=e.dam
                         # knock away from enemy
                         if p1.x > e.x:
                             p1.kb_x = p1.knockback_x   # knocked right
@@ -534,19 +547,29 @@ while running:
                 if e.hp > 0 and id(e) not in p1.hit_enemies:
                     if attack_rect.colliderect(e.get_rect()):
                         p1.hit_enemies.add(id(e))
+                        #does more damage if lunging vs slashing
                         if p1.attack_state == 3:
                             e.take_hit(20)
                         else:
                             e.take_hit(10)
+        if len(enemies) == p1.score and wave_timer == -1:
+            wave_timer = 5
+        elif len(enemies) == p1.score and wave_timer > 0:
+            wave_timer -=dt
+        if wave_timer <=0 and len(enemies) == p1.score:
+            for index, rows in enumerate(grid):
+                if "1" in str(rows):
+                    enemies.append(Enemy(random.randint(int(len(rows)*.4),int(len(rows)*.6))*TILE, (index+2) * TILE - (EH * SCALE), patrol_left=random.randint(int(len(rows)*.1),int(len(rows)*.4))*TILE, patrol_right=random.randint(int(len(rows)*.6),int(len(rows)*.9))*TILE))
+            wave_timer = -1
+            wave_num+=1
 
-        if win_timer <= 5:
-            win_timer -= dt
 
-        elif p1.score == len(enemies):
-            WIN = True
-            win_timer = 3
-        else:
-            WIN = False
+        # if win_timer <= 3:    ### change when adding winning (working on waves rn)
+        #     win_timer -= dt
+        # elif p1.score == len(enemies):
+        #     ## play_sound("win")
+        #     WIN = True
+        #     win_timer = 3
                 
         #calculates speed
         p1.max_speed = 0 if p1.max_speed == 128 else p1.max_speed
@@ -554,13 +577,16 @@ while running:
         p1.speed_y = abs(p1.y - past_y)
         p1.tot_speed = math.sqrt(p1.speed_x**2 + p1.speed_y**2)
         p1.max_speed = max(p1.max_speed, p1.tot_speed)
+    #if not in game
     else:
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 p1.handle_event(event)        
             if event.type == pygame.QUIT:
                 running = False
-    if (in_Game) or (not in_Game and not WIN):
+
+    #drawing ___
+    if (in_Game) or (not in_Game and paused):
         # draws player and enemies
         for e in enemies:
             if e.hp > 0:
@@ -577,6 +603,7 @@ while running:
         cooldown = my_font.render(f'lunge cooldown: {p1.stab_cooldown:.1f} {p1.max_speed:.2f}', False, BLACK)
         screen.blit(cooldown, (30,80))
         hp = my_font.render(f'{p1.hp}', False, BLACK)
+        wave_timer_text = my_font.render(f'Time until Wave {wave_num+1}: {int(wave_timer)}', False, BLACK)
         score_text = my_font.render(f'score: {p1.score}', False, BLACK)
         pause = pause_font.render(f'PAUSED', True, BLACK)
         win_message = pause_font.render(f'YOU WIN!!!', True, BLACK)
@@ -586,6 +613,8 @@ while running:
         pygame.draw.rect(screen, GREEN if p1.hp > 60  else ORANGE if p1.hp > 30 else RED, pygame.Rect(30,30,5*p1.hp,50))
         pygame.draw.rect(screen, BLACK, pygame.Rect(30,30,5*p1.max_hp,50),5)
         screen.blit(hp, (40,33))
+        if wave_timer != -1:
+            screen.blit(wave_timer_text, (100,100))
         screen.blit(score_text, (30, 115))
         if not in_Game and paused:
             screen.blit(pause, (250,150))
@@ -603,7 +632,7 @@ while running:
                       my_font.render(f'Damage Dealt: {p1.damage_dealt}', True, BLACK)
                       ]
         for index, stat in enumerate(stats_text):
-            screen.blit(stat, (150, 200 + (30 * (index+1))))
+            screen.blit(stat, (150, 220 + (40 * (index+1))))
     pygame.display.flip()
     if p1.hp <=0:
         break
