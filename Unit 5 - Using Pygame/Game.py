@@ -400,6 +400,9 @@ class Enemy:
         self.last_hit = 0
         self.harm = WHITE
         self.dam = 10
+        self.max_speed = random.randint(20,30)/10
+        self.prev_state = "accel"
+
 
         self.patrol_left = patrol_left
         self.patrol_right = patrol_right
@@ -423,43 +426,80 @@ class Enemy:
     def get_rect(self):
         return pygame.Rect(self.x+40, self.y+3, (EW * SCALE)-70, (EH * SCALE)+5)
     def update(self, dt):
+
+        self.new_facing_right = self.facing_right
         #hit timer
         if self.hit:
             self.last_hit += dt 
             if self.last_hit >= 0.5:
                 self.hit = False
                 self.last_hit = 0
-        # # Pick anim + speed based on state
-        # if self.state == "accel":
-        #     self.speed = min(self.speed + 0.5, 3)
-        #     anim = self.accel_frames
-        #     if self.speed >= 3:
-        #         self.state = "walk"
-        #         self.frame = 0
+        # Pick anim + speed based on state
 
-        # elif self.state == "walk":
-        #     self.speed = 4
-        #     anim = self.walk_frames
-        #     # Start slowing down when close to boundary
-        #     close_to_edge = (
-        #         (self.facing_right and self.x >= self.patrol_right - 40) or
-        #         (not self.facing_right and self.x <= self.patrol_left + 40)
-        #     )
-        #     if close_to_edge:
-        #         self.state = "decel"
-        #         self.frame = 0
+        close_to_player = abs(self.y - p1.y) < 100 and abs(self.x - p1.x) < 600
 
-        # elif self.state == "decel":
-        #     self.speed = max(self.speed - 0.5, 0)
-        #     anim = self.decel_frames
-        #     if self.speed == 0:
-        #         self.facing_right = not self.facing_right
-        #         self.state = "accel"
-        #         self.frame = 0
+        if not close_to_player and self.state == "following":
+            self.state = "accel"
+        if self.state == "decel":
+            self.speed = max(self.speed - 0.5, 0)
+            anim = self.decel_frames
+            if self.speed == 0:
+                if self.prev_state == "following":
+                    self.new_facing_right = self.x < p1.x
+                    self.state = "following"
+                else:
+                    self.new_facing_right = not self.facing_right
+                    self.state = "accel"
+                self.frame = 0
 
-        self.speed = 2 if self.x != p1.x else 0
-        anim = self.walk_frames
-        self.new_facing_right = self.x < p1.x
+        elif close_to_player:
+            self.state = "following"
+            self.speed = self.max_speed * 1.25 if self.x != p1.x else 0
+            anim = self.walk_frames
+            self.new_facing_right = self.x < p1.x
+            if self.facing_right != self.new_facing_right:
+                self.prev_state = "following"
+                self.state = "decel"
+                self.frame = 0
+
+        elif self.state == "accel":
+            self.speed = min(self.speed + 0.5, self.max_speed)
+            anim = self.accel_frames
+            if self.speed >= 3:
+                self.state = "walk"
+                self.frame = 0
+            close_to_edge = (
+            (self.new_facing_right and self.x >= self.patrol_right - 40) or
+            (not self.new_facing_right and self.x <= self.patrol_left + 40)
+            )
+            if close_to_edge:
+                self.prev_state = "accel"
+                self.state = "decel"
+                self.frame = 0
+            elif self.speed >= self.max_speed:
+                self.state = "walk"
+                self.frame = 0
+
+        elif self.state == "walk":
+            self.speed = self.max_speed
+            anim = self.walk_frames
+            close_to_edge = (
+                (self.new_facing_right and self.x >= self.patrol_right - 40) or
+                (not self.new_facing_right and self.x <= self.patrol_left + 40)
+            )
+            if close_to_edge:
+                self.prev_state = "walk"
+                self.state = "decel"
+                self.frame = 0
+
+        elif self.state == "following":
+            self.speed = self.max_speed * 1.25 if self.x != p1.x else 0
+            anim = self.walk_frames
+            self.new_facing_right = self.x < p1.x
+            if self.facing_right != self.new_facing_right:
+                self.prev_state = "following"
+                self.state = "decel"
+                self.frame = 0
 
         # Move
         self.x = self.x + self.speed if self.new_facing_right else self.x - self.speed
@@ -630,7 +670,7 @@ while running:
         hp = my_font.render(f'{p1.hp}', False, BLACK)
         wave_timer_text = wave_timer_font.render(f'Time until Wave {wave_num+1}: {int(wave_timer)}', False, BLACK)
         wave_text = my_font.render(f'wave: {wave_num}', False, BLACK)
-        score_text = my_font.render(f'score: {p1.score} speed : {p1.speed_x}', False, BLACK)
+        score_text = my_font.render(f'score: {p1.score}', False, BLACK)
         pause = pause_font.render(f'PAUSED', True, BLACK)
         win_message = pause_font.render(f'YOU WIN!!!', True, BLACK)
 
