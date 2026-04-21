@@ -56,6 +56,7 @@ CYAN = (0,255,255)
 #font
 pygame.font.init()
 my_font = pygame.font.SysFont('Comic Sans MS', 30)
+wave_timer_font = pygame.font.SysFont('Comic Sans MS', 60)
 pause_font = pygame.font.SysFont('Comic Sans MS', 80)
 
 #sets up frames
@@ -135,6 +136,26 @@ def play_sound(type):
         slash_s[random.randint(0, len(slash_s) -1)].play()
     if type == "stab":
         stab_s[random.randint(0, len(stab_s) -1)].play()
+
+def add_enemies(enemy_list, amount):
+    #if you input a decimal amount, the extra decimal will be the chance for a second enemy to spawn
+    if amount - int(amount) != 0:
+        chance = (amount - int(amount))*100
+    else:
+        chance = 0
+    amount = int(amount)
+    print(chance)
+    print(amount)
+    for index, rows in enumerate(grid):
+        extra = random.randint(0,100) <= chance and chance != 0
+        if extra:
+            amount +=1
+        for x in range(amount):
+            if "1" in str(rows):
+                enemy_list.append(Enemy(random.randint(int(len(rows)*.4),int(len(rows)*.6))*TILE, (index+2) * TILE - (EH * SCALE), patrol_left=random.randint(int(len(rows)*.1),int(len(rows)*.4))*TILE, patrol_right=random.randint(int(len(rows)*.6),int(len(rows)*.9))*TILE))
+        if extra:
+            amount -= 1
+    return enemy_list
 
 class Player:
     def __init__(self): #__init__ means initialize self is the characyer
@@ -225,20 +246,18 @@ class Player:
     def update(self, dt, keys, tile_rects):
         #stab cooldown
         p1.stab_cooldown -=dt
-        if p1.stab_cooldown < .07:
+        if p1.stab_cooldown <= 0:
             p1.stab_cooldown = 0
         # --- 1. Horizontal Movement & Collision ---
         self.moving = False
         dx = 0
+        if self.frame == 2 or self.frame == 6:
+            play_sound("footstep")
         if keys[pygame.K_a] and not (self.attacking and self.attack_state == 3 and self.facing_right):
-            if self.frame == 2 or self.frame == 6:
-                play_sound("footstep")
             dx -= self.speed
             self.facing_right = False
             self.moving = True
         if keys[pygame.K_d] and not (self.attacking and self.attack_state == 3 and not self.facing_right):
-            if self.frame == 2 or self.frame == 6:
-                play_sound("footstep")
             dx += self.speed
             self.facing_right = True
             self.moving = True
@@ -386,7 +405,7 @@ class Enemy:
         self.patrol_right = patrol_right
 
         self.accel_frames = [0, 1]
-        self.walk_frames  = [2, 3, 4, 5, 6]
+        self.walk_frames  = [0, 2, 3, 4, 5, 6]
         self.decel_frames = [1, 0]  # accel frames in reverse
 
         self.state = "accel"  # accel, walk, decel
@@ -410,52 +429,62 @@ class Enemy:
             if self.last_hit >= 0.5:
                 self.hit = False
                 self.last_hit = 0
-        # Pick anim + speed based on state
-        if self.state == "accel":
-            self.speed = min(self.speed + 0.5, 3)
-            anim = self.accel_frames
-            if self.speed >= 3:
-                self.state = "walk"
-                self.frame = 0
+        # # Pick anim + speed based on state
+        # if self.state == "accel":
+        #     self.speed = min(self.speed + 0.5, 3)
+        #     anim = self.accel_frames
+        #     if self.speed >= 3:
+        #         self.state = "walk"
+        #         self.frame = 0
 
-        elif self.state == "walk":
-            self.speed = 4
-            anim = self.walk_frames
-            # Start slowing down when close to boundary
-            close_to_edge = (
-                (self.facing_right and self.x >= self.patrol_right - 40) or
-                (not self.facing_right and self.x <= self.patrol_left + 40)
-            )
-            if close_to_edge:
-                self.state = "decel"
-                self.frame = 0
+        # elif self.state == "walk":
+        #     self.speed = 4
+        #     anim = self.walk_frames
+        #     # Start slowing down when close to boundary
+        #     close_to_edge = (
+        #         (self.facing_right and self.x >= self.patrol_right - 40) or
+        #         (not self.facing_right and self.x <= self.patrol_left + 40)
+        #     )
+        #     if close_to_edge:
+        #         self.state = "decel"
+        #         self.frame = 0
 
-        elif self.state == "decel":
-            self.speed = max(self.speed - 0.5, 0)
-            anim = self.decel_frames
-            if self.speed == 0:
-                self.facing_right = not self.facing_right
-                self.state = "accel"
-                self.frame = 0
+        # elif self.state == "decel":
+        #     self.speed = max(self.speed - 0.5, 0)
+        #     anim = self.decel_frames
+        #     if self.speed == 0:
+        #         self.facing_right = not self.facing_right
+        #         self.state = "accel"
+        #         self.frame = 0
+
+        self.speed = 2 if self.x != p1.x else 0
+        anim = self.walk_frames
+        self.new_facing_right = self.x < p1.x
 
         # Move
-        self.x = self.x + self.speed if self.facing_right else self.x - self.speed
+        self.x = self.x + self.speed if self.new_facing_right else self.x - self.speed
 
         # Animate
-        self.anim_timer += 0.067 #67777
+        self.anim_timer += 0.1 #67777
         if self.anim_timer >= 1:
-            self.anim_timer = 0
-            self.frame += 1
-            if self.frame >= len(anim):
+            if self.facing_right != self.new_facing_right:
+                self.anim_timer = 0
                 self.frame = 0
+            else:
+                self.anim_timer = 0
+                self.frame += 1
+                if self.frame >= len(anim):
+                    self.frame = 1
+        self.facing_right = self.new_facing_right
 
     def draw(self, surface, camera_x, camera_y):
-        if self.state == "accel":
-            anim = self.accel_frames
-        elif self.state == "walk":
-            anim = self.walk_frames
-        else:
-            anim = self.decel_frames
+        # if self.state == "accel":
+        #     anim = self.accel_frames
+        # elif self.state == "walk":
+        #     anim = self.walk_frames
+        # else:
+        #     anim = self.decel_frames
+        anim = self.walk_frames
 
         idx = anim[min(self.frame, len(anim) - 1)]
         img = enemy_frames[idx] if self.facing_right else enemy_frames_flipped[idx]
@@ -469,11 +498,8 @@ class Enemy:
 # --- Setup ---
 p1 = Player()
 #this was actually written by me!!
-enemies = [
-    Enemy(random.randint(int(len(rows)*.4),int(len(rows)*.6))*TILE, (index+2) * TILE - (EH * SCALE), patrol_left=random.randint(int(len(rows)*.1),int(len(rows)*.4))*TILE, patrol_right=random.randint(int(len(rows)*.6),int(len(rows)*.9))*TILE) 
-    for index, rows in enumerate(grid)
-    if "1" in str(rows)
-]
+enemies = add_enemies([], 1)
+
 
 # --- Game loop ---
 WIN = False
@@ -500,6 +526,7 @@ while running:
             p1.handle_event(event)
 
         p1.update(dt, keys, tile_rects)
+        
         if p1.x - camera_x < CAM_MARGIN_X:
             camera_x = p1.x - CAM_MARGIN_X
         elif p1.x - camera_x > WIDTH - CAM_MARGIN_X:
@@ -557,9 +584,7 @@ while running:
         elif len(enemies) == p1.score and wave_timer > 0:
             wave_timer -=dt
         if wave_timer <=0 and len(enemies) == p1.score:
-            for index, rows in enumerate(grid):
-                if "1" in str(rows):
-                    enemies.append(Enemy(random.randint(int(len(rows)*.4),int(len(rows)*.6))*TILE, (index+2) * TILE - (EH * SCALE), patrol_left=random.randint(int(len(rows)*.1),int(len(rows)*.4))*TILE, patrol_right=random.randint(int(len(rows)*.6),int(len(rows)*.9))*TILE))
+            enemies = add_enemies(enemies, .5 + (.5*wave_num))
             wave_timer = -1
             wave_num+=1
 
@@ -600,11 +625,12 @@ while running:
             pygame.draw.rect(screen, CYAN, attack_rect.move(-camera_x, -camera_y), 2) if p1.attack_state != 3 else pygame.draw.rect(screen, GREEN, attack_rect.move(-camera_x, -camera_y), 2)
 
         #prints text
-        cooldown = my_font.render(f'lunge cooldown: {p1.stab_cooldown:.1f} {p1.max_speed:.2f}', False, BLACK)
+        cooldown = my_font.render(f'lunge cooldown: {p1.stab_cooldown:.1f}', False, BLACK)
         screen.blit(cooldown, (30,80))
         hp = my_font.render(f'{p1.hp}', False, BLACK)
-        wave_timer_text = my_font.render(f'Time until Wave {wave_num+1}: {int(wave_timer)}', False, BLACK)
-        score_text = my_font.render(f'score: {p1.score}', False, BLACK)
+        wave_timer_text = wave_timer_font.render(f'Time until Wave {wave_num+1}: {int(wave_timer)}', False, BLACK)
+        wave_text = my_font.render(f'wave: {wave_num}', False, BLACK)
+        score_text = my_font.render(f'score: {p1.score} speed : {p1.speed_x}', False, BLACK)
         pause = pause_font.render(f'PAUSED', True, BLACK)
         win_message = pause_font.render(f'YOU WIN!!!', True, BLACK)
 
@@ -614,8 +640,9 @@ while running:
         pygame.draw.rect(screen, BLACK, pygame.Rect(30,30,5*p1.max_hp,50),5)
         screen.blit(hp, (40,33))
         if wave_timer != -1:
-            screen.blit(wave_timer_text, (100,100))
-        screen.blit(score_text, (30, 115))
+            screen.blit(wave_timer_text, (100,200))
+        screen.blit(wave_text, (30, 115))
+        screen.blit(score_text, (30, 150))
         if not in_Game and paused:
             screen.blit(pause, (250,150))
         elif WIN and win_timer>0:
