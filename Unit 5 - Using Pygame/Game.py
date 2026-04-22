@@ -1,3 +1,7 @@
+#TO DO: set up medkit (collision, spawning, check animation)
+#spawning: TILE * index of tile + 5 (centering)
+
+
 import pygame, random, math
 pygame.init()
 WIDTH, HEIGHT = 800, 600
@@ -23,18 +27,22 @@ playing = False
 body_sheet = pygame.image.load("Walking.png").convert_alpha()
 arms_sheet = pygame.image.load("arms.png").convert_alpha()
 enemy_sheet = pygame.image.load("Enemy.png").convert_alpha()
+medkit_sheet = pygame.image.load("medkit.png").convert_alpha()
 
 SCALE = 2
 
 BODY_FRAMES = 10
 ARM_FRAMES = 17
 ENEMY_FRAMES = 7
+MEDKIT_FRAMES = 5
 BW = body_sheet.get_width() // BODY_FRAMES
 BH = body_sheet.get_height()
 AW = arms_sheet.get_width() // ARM_FRAMES
 AH = arms_sheet.get_height()
 EW = enemy_sheet.get_width() // ENEMY_FRAMES
 EH = enemy_sheet.get_height()
+MW = medkit_sheet.get_width() // MEDKIT_FRAMES
+MH = medkit_sheet.get_height()
 
 #set up camera
 camera_x = 0
@@ -64,6 +72,7 @@ enemy_sheet.set_colorkey((0, 0, 0))
 body_frames = [pygame.transform.scale(body_sheet.subsurface((i*BW,0,BW,BH)), (BW*SCALE,BH*SCALE)) for i in range(BODY_FRAMES)]
 arms_frames = [pygame.transform.scale(arms_sheet.subsurface((i*AW,0,AW,AH)), (AW*SCALE,AH*SCALE)) for i in range(ARM_FRAMES)]
 enemy_frames = [pygame.transform.scale(enemy_sheet.subsurface((i*EW,0,EW,EH)), (EW*SCALE,EH*SCALE)) for i in range(ENEMY_FRAMES)]
+medkit_frames = [pygame.transform.scale(medkit_sheet.subsurface((i*MW,0,MW,MH)), (MW*SCALE,MH*SCALE)) for i in range(MEDKIT_FRAMES)]
 
 #flipped frames
 body_frames_flipped = [pygame.transform.flip(f, True, False) for f in body_frames]
@@ -164,7 +173,7 @@ class Player:
         self.max_speed = 0
         self.facing_right = True
         self.y_vel = 0
-        self.on_ground = True
+        self.on_ground = False
         self.moving = False
         self.hit = False
         self.last_hit = 0
@@ -275,8 +284,10 @@ class Player:
                     self.x = tile_rect.right - 40
                 self.kb_x = 0 # Stop horizontal momentum on wall hit
 
+
         # --- 2. Vertical Movement & Collision ---
-        self.y_vel += self.gravity
+        if not self.on_ground:
+            self.y_vel += self.gravity
         self.y += self.y_vel + self.kb_y
             
         # CRITICAL: Assume we are in the air until proven otherwise
@@ -296,6 +307,7 @@ class Player:
                     self.y = tile_rect.bottom
                     self.y_vel = 0
                     self.kb_y = 0
+
         if not self.on_ground:
             foot_check_rect = self.get_rect()
             foot_check_rect.y += 1 
@@ -316,8 +328,8 @@ class Player:
         if not self.on_ground:
             self.frame = 9 # Falling frame
         elif self.moving:
-            self.anim_timer += 0.15
-            if self.anim_timer >= 1:
+            self.anim_timer += dt
+            if self.anim_timer >= .13:
                 self.anim_timer = 0
                 self.frame = (self.frame % 8) + 1
         else:
@@ -400,7 +412,7 @@ class Enemy:
         self.last_hit = 0
         self.harm = WHITE
         self.dam = 10
-        self.max_speed = random.randint(20,30)/10
+        self.max_speed = random.randint(15,25)/10
         self.prev_state = "accel"
 
 
@@ -434,9 +446,10 @@ class Enemy:
             if self.last_hit >= 0.5:
                 self.hit = False
                 self.last_hit = 0
-        # Pick anim + speed based on state
 
-        close_to_player = abs(self.y - p1.y) < 100 and abs(self.x - p1.x) < 600
+        # Pick anim + speed based on state (this part is probably half ai generated because i got bored)
+
+        close_to_player = abs(self.y - p1.y) < 150 and abs(self.x - p1.x) < 600
 
         if not close_to_player and self.state == "following":
             self.state = "accel"
@@ -505,8 +518,8 @@ class Enemy:
         self.x = self.x + self.speed if self.new_facing_right else self.x - self.speed
 
         # Animate
-        self.anim_timer += 0.1 #67777
-        if self.anim_timer >= 1:
+        self.anim_timer += dt #67777
+        if self.anim_timer >= 1/3:
             if self.facing_right != self.new_facing_right:
                 self.anim_timer = 0
                 self.frame = 0
@@ -535,11 +548,54 @@ class Enemy:
 
         surface.blit(img, (self.x - camera_x, self.y - camera_y))
 
+class Upgrade:
+    def __init__(self, type):
+        self.type = type
+        self.frame = 0
+        self.anim_timer = 0
+
+        self.x = 0
+        self.y = 0
+
+        self.medkit_heal = 20
+
+    def update(self,dt, grid):
+        self.anim_timer += dt
+        if self.anim_timer >= .2:
+            self.frame +=1
+            self.anim_timer = 0
+
+        if self.x == 0 and self.y == 0:
+            self.spawn(grid)
+
+    def get_rect(self):
+        return pygame.Rect(self.x, self.y, (MW * SCALE), (MH * SCALE))
+
+    def touch(self):
+        if self.type == "medkit":
+            p1.hp = min(p1.hp + self.medkit_heal, p1.max_hp)
+        self.x, self.y = 0,0
+
+    def spawn(self, grid):
+        found = False
+        while found == False:
+            coordinate_y = random.randint(1,len(grid)-1)
+            coordinate_x = random.randint(0, len(grid[coordinate_y])-1)
+            if grid[coordinate_y][coordinate_x] == 0 and grid[coordinate_y+1][coordinate_x] != 0:
+                found = True
+        self.x = coordinate_x*TILE + 5
+        self.y = coordinate_y*TILE
+
+    def draw(self, surface, camera_x, camera_y):
+        img = medkit_frames[self.frame%MEDKIT_FRAMES - 1]
+        surface.blit(img, (self.x - camera_x, self.y - camera_y))
+
 # --- Setup ---
 p1 = Player()
 #this was actually written by me!!
 enemies = add_enemies([], 1)
 
+upgrades = [Upgrade("medkit")]
 
 # --- Game loop ---
 WIN = False
@@ -566,6 +622,9 @@ while running:
             p1.handle_event(event)
 
         p1.update(dt, keys, tile_rects)
+
+        for u in upgrades:
+            u.update(dt, grid)
         
         if p1.x - camera_x < CAM_MARGIN_X:
             camera_x = p1.x - CAM_MARGIN_X
@@ -619,6 +678,11 @@ while running:
                             e.take_hit(20)
                         else:
                             e.take_hit(10)
+
+        for u in upgrades:
+            if p1.get_rect().colliderect(u.get_rect()):
+                u.touch()
+
         if len(enemies) == p1.score and wave_timer == -1:
             wave_timer = 5
         elif len(enemies) == p1.score and wave_timer > 0:
@@ -658,6 +722,12 @@ while running:
                 e.draw(screen, camera_x, camera_y)
                 if hitboxes:
                     pygame.draw.rect(screen, RED, e.get_rect().move(-camera_x, -camera_y), 2)
+        
+        for u in upgrades:
+            u.draw(screen, camera_x, camera_y)
+            if hitboxes:
+                pygame.draw.rect(screen, GREEN, u.get_rect().move(-camera_x, -camera_y), 2)
+
         if hitboxes:
             pygame.draw.rect(screen, RED, p1.get_rect().move(-camera_x, -camera_y), 2)
         p1.draw(screen, camera_x, camera_y)
@@ -671,7 +741,7 @@ while running:
         wave_timer_text = wave_timer_font.render(f'Time until Wave {wave_num+1}: {int(wave_timer)}', False, BLACK)
         wave_text = my_font.render(f'wave: {wave_num}', False, BLACK)
         score_text = my_font.render(f'score: {p1.score}', False, BLACK)
-        pause = pause_font.render(f'PAUSED', True, BLACK)
+        pause = pause_font.render(f'PAUSED {p1.x}, {p1.y}', True, BLACK)
         win_message = pause_font.render(f'YOU WIN!!!', True, BLACK)
 
         #healthbar (all me)
