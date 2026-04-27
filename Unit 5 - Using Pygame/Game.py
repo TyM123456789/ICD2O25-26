@@ -14,7 +14,7 @@ jump = [pygame.mixer.Sound("jump.wav"), pygame.mixer.Sound("jump2.wav")]
 hit_s = [pygame.mixer.Sound("hit1.wav"), pygame.mixer.Sound("hit2.wav")]
 pause_s = [pygame.mixer.Sound("pause sound.wav"), pygame.mixer.Sound("pause2.wav")]
 die_s = [pygame.mixer.Sound("die.wav"),pygame.mixer.Sound("die2.wav"), pygame.mixer.Sound("die3.wav")]
-win_s = [pygame.mixer.Sound("victory drumroll.mp3")]
+upgrade_s = [pygame.mixer.Sound("upgrade1.wav"), pygame.mixer.Sound("upgrade2.wav")]
 #footsteps arent working right now
 footstep_s = [pygame.mixer.Sound("footstep 1.wav")]
 for sound in footstep_s:
@@ -22,7 +22,6 @@ for sound in footstep_s:
 player_hit_s = [pygame.mixer.Sound("player hit.wav"), pygame.mixer.Sound("player hit2.wav")]
 slash_s = [pygame.mixer.Sound("SWORD 1.mp3"), pygame.mixer.Sound("SWORD 3 (non-brutal).mp3")]
 stab_s = [pygame.mixer.Sound("SWORD 2 (brutal).mp3"), pygame.mixer.Sound("SWORD 4 (metal).mp3")]
-playing = False
 # --- Load assets ---
 body_sheet = pygame.image.load("Walking.png").convert_alpha()
 arms_sheet = pygame.image.load("arms.png").convert_alpha()
@@ -44,12 +43,6 @@ EH = enemy_sheet.get_height()
 MW = medkit_sheet.get_width() // MEDKIT_FRAMES
 MH = medkit_sheet.get_height()
 
-#set up camera
-camera_x = 0
-camera_y=0
-CAM_MARGIN_X = 300
-hitboxes = False
-
 #colors
 WHITE = (255,255,255)
 SKY = (1, 183, 238)
@@ -64,6 +57,7 @@ CYAN = (0,255,255)
 #font
 pygame.font.init()
 my_font = pygame.font.SysFont('Comic Sans MS', 30)
+spawn_font = pygame.font.SysFont('Comic Sans MS', 40)
 wave_timer_font = pygame.font.SysFont('Comic Sans MS', 60)
 pause_font = pygame.font.SysFont('Comic Sans MS', 80)
 
@@ -104,16 +98,18 @@ wave_num = 1
 # Calculate map dimensions in pixels
 map_width = len(grid[0]) * TILE
 map_height = len(grid) * TILE
-def draw_tiles(grid, camera_x, camera_y):
+def draw_tiles(grid, camera):
     x=0
     y=0
-    for row_i, row in enumerate(grid):
-        y=-camera_y
+    camera_rect = camera.get_rect()
+    for row_i, row in enumerate(grid): 
+        y=-camera.y
         for col_i, tile in enumerate(row):
             if tile != 0:
-                x = col_i * TILE - camera_x
-                y = row_i * TILE - camera_y
-                screen.blit (tiles[tile], (x,y))
+                x = col_i * TILE - camera.x
+                y = row_i * TILE - camera.y
+                if camera_rect.colliderect(pygame.Rect(col_i * TILE, row_i * TILE, TILE, TILE)):
+                    screen.blit (tiles[tile], (x,y))
 
 def get_tile_rects(grid):
     rects = []
@@ -124,7 +120,6 @@ def get_tile_rects(grid):
     return rects
 
 def play_sound(type):
-    global playing
     if type == "die":
         die_s[random.randint(0, len(die_s) -1)].play()
     if type == "enemy hit":
@@ -135,12 +130,8 @@ def play_sound(type):
         pause_s[random.randint(0, len(pause_s) -1)].play()
     if type == "jump":
         jump[random.randint(0, len(jump) -1)].play()
-    # if type == "win":
-    #     win_s[random.randint(0,len(win_s)-1)].play
-    # if type =="footstep" and not playing:
-    #     playing = True
-    #     footstep_s[random.randint(0, len(footstep_s) -1)].play()
-    #     playing = False
+    if type == "upgrade":
+        upgrade_s[random.randint(0, len(upgrade_s)-1)].play()
     if type == "slash":
         slash_s[random.randint(0, len(slash_s) -1)].play()
     if type == "stab":
@@ -153,8 +144,6 @@ def add_enemies(enemy_list, amount):
     else:
         chance = 0
     amount = int(amount)
-    print(chance)
-    print(amount)
     for index, rows in enumerate(grid):
         extra = random.randint(0,100) <= chance and chance != 0
         if extra:
@@ -165,6 +154,18 @@ def add_enemies(enemy_list, amount):
         if extra:
             amount -= 1
     return enemy_list
+
+def text_to_screen(text, font, color, x, y):
+    textt = font.render(text, False, color)
+    screen.blit(textt, (x, y))
+
+Spawn_text = []
+spawn_text_timer = 1.5
+current_text = 0
+
+#creates text that shows when upgrades spawn
+def spawn_text(type, font, color):
+    Spawn_text.append(font.render(f'A {type} has spawned!', False, color))
 
 class Player:
     def __init__(self): #__init__ means initialize self is the characyer
@@ -193,6 +194,7 @@ class Player:
         self.frame = 0
         self.anim_timer = 0
         self.damage_dealt = 0
+        self.healed = 0
 
 
         self.slashes = 0
@@ -204,7 +206,8 @@ class Player:
         self.attack_timer = 0
 
     def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not self.attacking:
+        #event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and not self.attacking:
             play_sound("slash")
             # cycle between slash1 and slash2
             if self.attack_state == 1:
@@ -241,14 +244,14 @@ class Player:
 
         # Jump Start
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE and self.on_ground:
+            if event.key == pygame.K_w and self.on_ground:
                 play_sound("jump")
                 self.y_vel = p1.jump  # Initial jump burst
                 self.on_ground = False
 
                 # Variable Jump: If they let go of Space while moving up
         if event.type == pygame.KEYUP:
-            if event.key == pygame.K_SPACE:
+            if event.key == pygame.K_w:
                 if self.y_vel < -3: # If still moving upward significantly
                     self.y_vel = -3 # "Cut" the jump velocity
 
@@ -352,6 +355,7 @@ class Player:
                 if self.attack_frame >= len(anim):
                     self.attack_frame = 0
                     self.attacking = False
+   
     def get_rect(self):
         return pygame.Rect(self.x+20*SCALE, self.y, (BW -40)* SCALE, BH * SCALE)
 
@@ -384,7 +388,7 @@ class Player:
         ay = self.y + 10 * SCALE if self.attack_state != 3 else self.y + 20*SCALE
         return pygame.Rect(ax, ay, arm_width, arm_height)
 
-    def draw(self, surface, camera_x, camera_y):
+    def draw(self, surface, camera):
         offset_x = -12 if not self.facing_right else 0
 
         body = self.get_body()
@@ -394,11 +398,11 @@ class Player:
             harm_arms = arms.copy()
             harm_body.fill((self.harm), special_flags=pygame.BLEND_RGB_MAX)
             harm_arms.fill((self.harm), special_flags=pygame.BLEND_RGB_MAX)
-            surface.blit(harm_body, (self.x - camera_x, self.y - camera_y))
-            surface.blit(harm_arms, (self.x - camera_x + offset_x, self.y - 10 - camera_y))            
+            surface.blit(harm_body, (self.x - camera.x, self.y - camera.y))
+            surface.blit(harm_arms, (self.x - camera.x + offset_x, self.y - 10 - camera.y))            
         else:   
-            surface.blit(body, (self.x - camera_x, self.y - camera_y))
-            surface.blit(arms, (self.x - camera_x + offset_x, self.y - 10 - camera_y))
+            surface.blit(body, (self.x - camera.x, self.y - camera.y))
+            surface.blit(arms, (self.x - camera.x + offset_x, self.y - 10 - camera.y))
 
 class Enemy:
     def __init__(self, x, platform, patrol_left=200, patrol_right=500):
@@ -530,7 +534,7 @@ class Enemy:
                     self.frame = 1
         self.facing_right = self.new_facing_right
 
-    def draw(self, surface, camera_x, camera_y):
+    def draw(self, surface, camera):
         # if self.state == "accel":
         #     anim = self.accel_frames
         # elif self.state == "walk":
@@ -546,7 +550,7 @@ class Enemy:
             img = img.copy()
             img.fill(self.harm, special_flags=pygame.BLEND_RGB_MAX)
 
-        surface.blit(img, (self.x - camera_x, self.y - camera_y))
+        surface.blit(img, (self.x - camera.x, self.y - camera.y))
 
 class Upgrade:
     def __init__(self, type):
@@ -557,7 +561,10 @@ class Upgrade:
         self.x = 0
         self.y = 0
 
+        #medkit
         self.medkit_heal = 20
+        if self.type == "medkit":
+            self.spawn_timer = 10
 
     def update(self,dt, grid):
         self.anim_timer += dt
@@ -565,15 +572,22 @@ class Upgrade:
             self.frame +=1
             self.anim_timer = 0
 
-        if self.x == 0 and self.y == 0:
+        if self.spawn_timer >0:
+            self.spawn_timer -= dt
+        elif self.x == 0 and self.y == 0:
+            spawn_text("medkit", spawn_font, GREEN)
             self.spawn(grid)
 
     def get_rect(self):
         return pygame.Rect(self.x, self.y, (MW * SCALE), (MH * SCALE))
 
     def touch(self):
+        play_sound("upgrade")
         if self.type == "medkit":
+            p1.healed += min(self.medkit_heal, p1.max_hp - p1.hp)
             p1.hp = min(p1.hp + self.medkit_heal, p1.max_hp)
+            self.spawn_timer = 10
+        
         self.x, self.y = 0,0
 
     def spawn(self, grid):
@@ -586,24 +600,44 @@ class Upgrade:
         self.x = coordinate_x*TILE + 5
         self.y = coordinate_y*TILE
 
-    def draw(self, surface, camera_x, camera_y):
+    def draw(self, surface, camera):
         img = medkit_frames[self.frame%MEDKIT_FRAMES - 1]
-        surface.blit(img, (self.x - camera_x, self.y - camera_y))
+        surface.blit(img, (self.x - camera.x, self.y - camera.y))
+
+class Camera:
+    def update(self):
+        if p1.x - self.x < CAM_MARGIN_X:
+            self.x = p1.x - CAM_MARGIN_X
+        elif p1.x - self.x > WIDTH - CAM_MARGIN_X:
+            self.x = p1.x - (WIDTH - CAM_MARGIN_X)
+        self.y = p1.y - HEIGHT // 2
+
+        # --- NEW: Clamp Camera to Map Edges ---
+        # Keep X between 0 and (Map Width - Screen Width)
+        self.x = max(0, min(self.x, map_width - WIDTH))
+
+    def get_rect(self):
+        global WIDTH, HEIGHT
+        return pygame.Rect(self.x, self.y, (WIDTH), (HEIGHT))
+
 
 # --- Setup ---
 p1 = Player()
 #this was actually written by me!!
 enemies = add_enemies([], 1)
-
+camera= Camera()
 upgrades = [Upgrade("medkit")]
+#set up camera
+camera.x = 0
+camera.y=0
+CAM_MARGIN_X = 300
+hitboxes = False
 
 # --- Game loop ---
-WIN = False
 running = True
 in_Game = True
 paused = False
 time = 0
-win_timer = 100000000000
 tile_rects = get_tile_rects(grid)
 
 while running:
@@ -626,24 +660,16 @@ while running:
         for u in upgrades:
             u.update(dt, grid)
         
-        if p1.x - camera_x < CAM_MARGIN_X:
-            camera_x = p1.x - CAM_MARGIN_X
-        elif p1.x - camera_x > WIDTH - CAM_MARGIN_X:
-            camera_x = p1.x - (WIDTH - CAM_MARGIN_X)
-        camera_y = p1.y - HEIGHT // 2
-
-        # --- NEW: Clamp Camera to Map Edges ---
-        # Keep X between 0 and (Map Width - Screen Width)
-        camera_x = max(0, min(camera_x, map_width - WIDTH))
+        camera.update()
 
         for e in enemies:
             e.update(dt)
 
         screen.fill(SKY)
 
-        screen.blit(BG, (0-camera_x*.5,-250-camera_y*.5))
+        screen.blit(BG, (0-camera.x*.5,-250-camera.y*.5))
 
-        draw_tiles(grid, camera_x, camera_y)
+        draw_tiles(grid, camera)
 
         if p1.last_hit >= .5:
             p1.hit = False
@@ -691,14 +717,6 @@ while running:
             enemies = add_enemies(enemies, .5 + (.5*wave_num))
             wave_timer = -1
             wave_num+=1
-
-
-        # if win_timer <= 3:    ### change when adding winning (working on waves rn)
-        #     win_timer -= dt
-        # elif p1.score == len(enemies):
-        #     ## play_sound("win")
-        #     WIN = True
-        #     win_timer = 3
                 
         #calculates speed
         p1.max_speed = 0 if p1.max_speed == 128 else p1.max_speed
@@ -719,59 +737,59 @@ while running:
         # draws player and enemies
         for e in enemies:
             if e.hp > 0:
-                e.draw(screen, camera_x, camera_y)
+                e.draw(screen, camera)
                 if hitboxes:
-                    pygame.draw.rect(screen, RED, e.get_rect().move(-camera_x, -camera_y), 2)
+                    pygame.draw.rect(screen, RED, e.get_rect().move(-camera.x, -camera.y), 2)
         
         for u in upgrades:
-            u.draw(screen, camera_x, camera_y)
-            if hitboxes:
-                pygame.draw.rect(screen, GREEN, u.get_rect().move(-camera_x, -camera_y), 2)
+            if u.x != 0 or u.y != 0:
+                u.draw(screen, camera)
+                if hitboxes:
+                    pygame.draw.rect(screen, GREEN, u.get_rect().move(-camera.x, -camera.y), 2)
+        [p1.draw(screen, camera)]
 
         if hitboxes:
-            pygame.draw.rect(screen, RED, p1.get_rect().move(-camera_x, -camera_y), 2)
-        p1.draw(screen, camera_x, camera_y)
+            pygame.draw.rect(screen, RED, p1.get_rect().move(-camera.x, -camera.y), 2)
+
         if attack_rect and hitboxes:
-            pygame.draw.rect(screen, CYAN, attack_rect.move(-camera_x, -camera_y), 2) if p1.attack_state != 3 else pygame.draw.rect(screen, GREEN, attack_rect.move(-camera_x, -camera_y), 2)
+            pygame.draw.rect(screen, CYAN, attack_rect.move(-camera.x, -camera.y), 2) if p1.attack_state != 3 else pygame.draw.rect(screen, GREEN, attack_rect.move(-camera.x, -camera.y), 2)
 
         #prints text
-        cooldown = my_font.render(f'lunge cooldown: {p1.stab_cooldown:.1f}', False, BLACK)
-        screen.blit(cooldown, (30,80))
-        hp = my_font.render(f'{p1.hp}', False, BLACK)
-        wave_timer_text = wave_timer_font.render(f'Time until Wave {wave_num+1}: {int(wave_timer)}', False, BLACK)
-        wave_text = my_font.render(f'wave: {wave_num}', False, BLACK)
-        score_text = my_font.render(f'score: {p1.score}', False, BLACK)
-        pause = pause_font.render(f'PAUSED {p1.x}, {p1.y}', True, BLACK)
-        win_message = pause_font.render(f'YOU WIN!!!', True, BLACK)
+        text_to_screen(f'lunge cooldown: {p1.stab_cooldown:.1f}', my_font, BLACK, 30, 80)
 
         #healthbar (all me)
         pygame.draw.rect(screen, GRAY, pygame.Rect(30,30,5*p1.max_hp,50))
         pygame.draw.rect(screen, GREEN if p1.hp > 60  else ORANGE if p1.hp > 30 else RED, pygame.Rect(30,30,5*p1.hp,50))
         pygame.draw.rect(screen, BLACK, pygame.Rect(30,30,5*p1.max_hp,50),5)
-        screen.blit(hp, (40,33))
+        text_to_screen(f'{p1.hp}', my_font, BLACK, 40, 33)
         if wave_timer != -1:
-            screen.blit(wave_timer_text, (100,200))
-        screen.blit(wave_text, (30, 115))
-        screen.blit(score_text, (30, 150))
+            text_to_screen(f'Time until Wave {wave_num+1}: {int(wave_timer)}', wave_timer_font, BLACK, 100, 200)
+        text_to_screen(f'wave: {wave_num}', my_font, BLACK, 30, 115)
+        text_to_screen(f'score: {p1.score}', my_font, BLACK, 30, 150)
+
+
+        if len(Spawn_text) >= 1 and spawn_text_timer > 0:
+            screen.blit(Spawn_text[0], (200,500))
+            spawn_text_timer -= dt
+        elif len(Spawn_text) != 0 and spawn_text_timer <=0:
+            del Spawn_text[0]
+            spawn_text_timer = 1.5
+
         if not in_Game and paused:
-            screen.blit(pause, (250,150))
-        elif WIN and win_timer>0:
-            screen.blit(win_message, (220, 233))
-        elif win_timer <= 0.1:
-            in_Game = False
+            text_to_screen(f"PAUSED", pause_font, BLACK, 250, 150)
     else:
         screen.fill(GRAY)
-        win_message = pause_font.render(f'YOU WIN!!!', True, BLACK)
-        screen.blit(win_message, (200, 100))
-        stats_text = [my_font.render(f'{f'   You finished in {time:.1f} seconds':^40}', True, BLACK), 
-                      my_font.render(f'{f'Damage Taken: {p1.max_hp-p1.hp}':<20}{f'Enemies Killed: {p1.score}':>20}', True, BLACK),  
-                      my_font.render(f'{f'Slashes: {p1.slashes}':<20}{f'Stabs: {p1.stabs}':>29}', True, BLACK),
-                      my_font.render(f'Damage Dealt: {p1.damage_dealt}', True, BLACK)
+        text_to_screen(f'GAME OVER', pause_font, BLACK, 150, 100)
+        stats_text = [my_font.render(f'{f'    You lasted for {time:.1f} seconds':^40}', True, BLACK), 
+                      my_font.render(f'{f'Damage Taken: {p1.max_hp-p1.hp}':<20}{f'Amount Healed: {p1.healed}':>20}', True, BLACK),
+                      my_font.render(f'{f'Damage Dealt: {p1.damage_dealt}':<20}{f'Enemies Killed: {p1.score}':>24}', True, BLACK),  
+                      my_font.render(f'{f'Slashes: {p1.slashes}':<20}{f'Lunges: {p1.stabs}':>33}', True, BLACK),
                       ]
         for index, stat in enumerate(stats_text):
-            screen.blit(stat, (150, 220 + (40 * (index+1))))
+            screen.blit(stat, (100, 220 + (40 * (index+1))))
     pygame.display.flip()
     if p1.hp <=0:
-        break
+        in_Game = False
+        dead = True
 
 pygame.quit()
