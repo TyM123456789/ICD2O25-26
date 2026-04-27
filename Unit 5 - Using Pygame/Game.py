@@ -1,13 +1,9 @@
-#TO DO: set up medkit (collision, spawning, check animation)
-#spawning: TILE * index of tile + 5 (centering)
-
-
 import pygame, random, math
 pygame.init()
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
-pygame.display.set_caption("Character Demo")
+pygame.display.set_caption("Save your grandma pls")
 #setup sound
 pygame.mixer.init()
 jump = [pygame.mixer.Sound("jump.wav"), pygame.mixer.Sound("jump2.wav")]
@@ -15,13 +11,13 @@ hit_s = [pygame.mixer.Sound("hit1.wav"), pygame.mixer.Sound("hit2.wav")]
 pause_s = [pygame.mixer.Sound("pause sound.wav"), pygame.mixer.Sound("pause2.wav")]
 die_s = [pygame.mixer.Sound("die.wav"),pygame.mixer.Sound("die2.wav"), pygame.mixer.Sound("die3.wav")]
 upgrade_s = [pygame.mixer.Sound("upgrade1.wav"), pygame.mixer.Sound("upgrade2.wav")]
-#footsteps arent working right now
-footstep_s = [pygame.mixer.Sound("footstep 1.wav")]
-for sound in footstep_s:
-    sound.set_volume(.01)
 player_hit_s = [pygame.mixer.Sound("player hit.wav"), pygame.mixer.Sound("player hit2.wav")]
 slash_s = [pygame.mixer.Sound("SWORD 1.mp3"), pygame.mixer.Sound("SWORD 3 (non-brutal).mp3")]
 stab_s = [pygame.mixer.Sound("SWORD 2 (brutal).mp3"), pygame.mixer.Sound("SWORD 4 (metal).mp3")]
+player_die_s = [pygame.mixer.Sound("player die.wav")]
+
+pygame.mixer.music.load('bg music.mp3')
+pygame.mixer.music.set_volume(0.5)
 # --- Load assets ---
 body_sheet = pygame.image.load("Walking.png").convert_alpha()
 arms_sheet = pygame.image.load("arms.png").convert_alpha()
@@ -95,9 +91,11 @@ tiles = [
 
 wave_timer = -1
 wave_num = 1
+
 # Calculate map dimensions in pixels
 map_width = len(grid[0]) * TILE
 map_height = len(grid) * TILE
+
 def draw_tiles(grid, camera):
     x=0
     y=0
@@ -136,6 +134,9 @@ def play_sound(type):
         slash_s[random.randint(0, len(slash_s) -1)].play()
     if type == "stab":
         stab_s[random.randint(0, len(stab_s) -1)].play()
+    if type == "player die":
+        player_die_s[random.randint(0, len(player_die_s) -1)].play()
+
 
 def add_enemies(enemy_list, amount):
     #if you input a decimal amount, the extra decimal will be the chance for a second enemy to spawn
@@ -144,7 +145,6 @@ def add_enemies(enemy_list, amount):
     else:
         chance = 0
     amount = int(amount)
-    print (amount)
     for index, rows in enumerate(grid):
         extra = random.randint(0,100) <= chance and chance != 0
         if extra:
@@ -241,6 +241,10 @@ class Player:
             global in_Game, paused
             play_sound("pause_s")
             paused = not paused
+            if paused:
+                pygame.mixer.music.pause()
+            else:
+                pygame.mixer.music.unpause()
             in_Game = not in_Game
 
         # Jump Start
@@ -264,8 +268,6 @@ class Player:
         # --- 1. Horizontal Movement & Collision ---
         self.moving = False
         dx = 0
-        if self.frame == 2 or self.frame == 6:
-            play_sound("footstep")
         if keys[pygame.K_a] and not (self.attacking and self.attack_state == 3 and self.facing_right):
             dx -= self.speed
             self.facing_right = False
@@ -341,7 +343,7 @@ class Player:
 
         # Advance attack frame
         if self.attacking:
-            anim = [slash1, slash2, stab][self.attack_state - 1]
+            anim = [slash1, slash2, stab][self.attack_state - 1] 
             self.attack_timer += dt
             #attack animation speed
             if self.attack_timer >= 0.1:
@@ -536,12 +538,6 @@ class Enemy:
         self.facing_right = self.new_facing_right
 
     def draw(self, surface, camera):
-        # if self.state == "accel":
-        #     anim = self.accel_frames
-        # elif self.state == "walk":
-        #     anim = self.walk_frames
-        # else:
-        #     anim = self.decel_frames
         anim = self.walk_frames
 
         idx = anim[min(self.frame, len(anim) - 1)]
@@ -626,20 +622,24 @@ class Camera:
 p1 = Player()
 #this was actually written by me!!
 enemies = add_enemies([], 1)
-camera= Camera()
+camera = Camera()
 upgrades = [Upgrade("medkit")]
 #set up camera
 camera.x = 0
-camera.y=0
+camera.y = 0
 CAM_MARGIN_X = 300
 hitboxes = False
 
 # --- Game loop ---
 running = True
 in_Game = True
+dead = False
 paused = False
 time = 0
 tile_rects = get_tile_rects(grid)
+
+
+pygame.mixer.music.play(loops=-1)
 
 while running:
     if in_Game:
@@ -681,10 +681,11 @@ while running:
             for e in enemies:
                 if e.hp > 0:
                     if p1.get_rect().colliderect(e.get_rect()):
-                        play_sound("player hit")
                         p1.hit = True
                         p1.last_hit = 0
                         p1.hp-=e.dam
+                        if p1.hp > 0:
+                            play_sound("player hit")
                         # knock away from enemy
                         if p1.x > e.x:
                             p1.kb_x = p1.knockback_x   # knocked right
@@ -726,6 +727,7 @@ while running:
         p1.speed_y = abs(p1.y - past_y)
         p1.tot_speed = math.sqrt(p1.speed_x**2 + p1.speed_y**2)
         p1.max_speed = max(p1.max_speed, p1.tot_speed)
+
     #if not in game
     else:
         for event in pygame.event.get():
@@ -748,7 +750,7 @@ while running:
                 u.draw(screen, camera)
                 if hitboxes:
                     pygame.draw.rect(screen, GREEN, u.get_rect().move(-camera.x, -camera.y), 2)
-        [p1.draw(screen, camera)]
+        p1.draw(screen, camera)
 
         if hitboxes:
             pygame.draw.rect(screen, RED, p1.get_rect().move(-camera.x, -camera.y), 2)
@@ -790,7 +792,8 @@ while running:
         for index, stat in enumerate(stats_text):
             screen.blit(stat, (100, 220 + (40 * (index+1))))
     pygame.display.flip()
-    if p1.hp <=0:
+    if p1.hp <=0 and not dead:
+        play_sound('player die')
         in_Game = False
         dead = True
 
