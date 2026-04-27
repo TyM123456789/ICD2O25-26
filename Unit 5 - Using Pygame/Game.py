@@ -144,6 +144,7 @@ def add_enemies(enemy_list, amount):
     else:
         chance = 0
     amount = int(amount)
+    print (amount)
     for index, rows in enumerate(grid):
         extra = random.randint(0,100) <= chance and chance != 0
         if extra:
@@ -714,9 +715,10 @@ while running:
         elif len(enemies) == p1.score and wave_timer > 0:
             wave_timer -=dt
         if wave_timer <=0 and len(enemies) == p1.score:
+            wave_num+=1
             enemies = add_enemies(enemies, .5 + (.5*wave_num))
             wave_timer = -1
-            wave_num+=1
+            
                 
         #calculates speed
         p1.max_speed = 0 if p1.max_speed == 128 else p1.max_speed
