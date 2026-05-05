@@ -1,3 +1,5 @@
+#hange fonts
+
 import pygame, random, math
 pygame.init()
 WIDTH, HEIGHT = 800, 600
@@ -55,6 +57,9 @@ GRAY = (130,130,130)
 CYAN = (0,255,255)
 
 #font
+comic_sans = 'Comic Sans MS'
+arial = 'Arial'
+
 pygame.font.init()
 my_font = pygame.font.SysFont('Comic Sans MS', 30)
 spawn_font = pygame.font.SysFont('Comic Sans MS', 40)
@@ -101,7 +106,7 @@ tiles = [
 ]
 
 wave_timer = -1
-wave_num = 4
+wave_num = 1
 
 # Calculate map dimensions in pixels
 map_width = len(grid[0]) * TILE
@@ -191,7 +196,7 @@ def spawn_text(type, font, color):
 # objects but before the UI so they always appear on top of terrain/enemies.
 # ─────────────────────────────────────────────────────────────────────────────
 class Laser:
-    WARNING_DURATION = 1   # seconds the thin warning line shows before firing
+    WARNING_DURATION = .75   # seconds the thin warning line shows before firing
     ACTIVE_DURATION  = 1.5   # seconds the full beam stays active
     BEAM_WIDTH       = 40    # pixel width of the active beam
     DAMAGE           = 1    # HP taken if the player is inside the beam
@@ -200,7 +205,6 @@ class Laser:
         self.x     = x           # world-space X position of the beam centre
         self.timer = 0.0
         self.state = "warning"   # "warning" → "active" → "done"
-        self.hit_player = False  # so we only deal damage once per activation
 
     def update(self, dt):
         self.timer += dt
@@ -210,19 +214,18 @@ class Laser:
             if self.timer >= self.WARNING_DURATION:
                 self.state = "active"
                 self.timer = 0.0
-                self.hit_player = False  # reset hit flag for this pulse
 
         elif self.state == "active":
             # Check whether the player is standing inside the beam (one hit per pulse)
-            if not self.hit_player and p1.kb_x > 0:
-                beam_rect = pygame.Rect(
-                    self.x - self.BEAM_WIDTH // 2, 0,
-                    self.BEAM_WIDTH, map_height
-                )
-                if beam_rect.colliderect(p1.get_rect()):
-                    p1.hp -= self.DAMAGE
-                    if p1.hp > 0:
-                        play_sound("player hit")
+
+            beam_rect = pygame.Rect(
+                self.x - self.BEAM_WIDTH // 2, 0,
+                self.BEAM_WIDTH, map_height
+            )
+            if beam_rect.colliderect(p1.get_rect()):
+                p1.hp -= self.DAMAGE
+                if p1.hp > 0:
+                    play_sound("player hit")
 
             # Beam turns off after its active duration
             if self.timer >= self.ACTIVE_DURATION:
@@ -523,6 +526,7 @@ class Enemy:
             self.decel_frames = [1, 0]  # accel frames in reverse
 
             self.state = "accel"  # accel, walk, decel
+            self.laser_round_state = "noo" #nromal enemies cant fire lasers
         else:
             self.phase = 1
             self.hp = 400
@@ -538,7 +542,7 @@ class Enemy:
             self.start_x          = self.x # original spawn X (used for retreat)
             self.start_y          = self.y # original spawn Y
             self.laser_round      = 0      # how many laser rounds have completed
-            self.max_laser_rounds = 3      # total laser rounds before speed boost
+            self.max_laser_rounds = 5     # total laser rounds before speed boost
             # "idle"     → not yet in laser phase
             # "warning"  → lasers are showing the warning line
             # "active"   → lasers are firing
@@ -821,7 +825,7 @@ class Upgrade:
         self.y = 0
 
         #medkit
-        self.medkit_heal = 20
+        self.medkit_heal = 40
         if self.type == "medkit":
             self.spawn_timer += 10
 
@@ -970,7 +974,7 @@ while running:
         #if there was an attack, check for hits
         if attack_rect:
             for e in enemies:
-                if e.hp > 0 and id(e) not in p1.hit_enemies:
+                if e.hp > 0 and id(e) not in p1.hit_enemies and not (e.laser_round_state in ("warning", "active", "cooldown")):
                     if attack_rect.colliderect(e.get_rect()):
                         p1.hit_enemies.add(id(e))
                         #does more damage if lunging vs slashing
@@ -989,13 +993,14 @@ while running:
             wave_timer -=dt
         if wave_timer <=0 and len(enemies) == p1.score:
             wave_num+=1
-            if wave_num % 5 != 0:
+            if wave_num > 5:
+                in_Game = False
+                win = True
+            elif wave_num % 5 != 0:
                 enemies = add_enemies(enemies, .5 + (.5*wave_num))
             elif wave_num == 5:
                 enemies = add_boss(enemies)
-            else:
-                in_Game = False
-                win = True
+
             wave_timer = -1
             
                 
@@ -1044,35 +1049,33 @@ while running:
             l.draw(screen, camera)
 
         #prints text
-        text_to_screen(f'lunge cooldown: {p1.stab_cooldown:.1f}', my_font, BLACK, 30, 80)
+        text_to_screen(f'Lunge Cooldown: {p1.stab_cooldown:.1f}', my_font, BLACK, 30, 80)
 
         #healthbar (all me)
         pygame.draw.rect(screen, GRAY, pygame.Rect(30,30,5*p1.max_hp,50))
         pygame.draw.rect(screen, GREEN if p1.hp > 60  else ORANGE if p1.hp > 30 else RED, pygame.Rect(30,30,5*p1.hp,50))
         pygame.draw.rect(screen, BLACK, pygame.Rect(30,30,5*p1.max_hp,50),5)
         text_to_screen(f'{int(p1.hp)}', my_font, BLACK, 40, 33)
-        if wave_timer != -1:
-            if (wave_num + 1) % 5 != 0:
-                text_to_screen(f'Time until Wave {wave_num+1}: {int(wave_timer)}', wave_timer_font, BLACK, 100, 200)
-            else:
-                text_to_screen(f'BOSS INCOMING: {int(wave_timer)}', wave_timer_font, BLACK, 100, 200)
+
 
         if wave_num == 5:
             #boss healthbar (all me)
             pygame.draw.rect(screen, GRAY, pygame.Rect(50,470,1.75*400,80))
             pygame.draw.rect(screen, RED, pygame.Rect(50,470,int(1.75*enemies[-1].hp),80))
             pygame.draw.rect(screen, BLACK, pygame.Rect(50,470,int(1.75*400),80),5)
-            text_to_screen(f'{int(enemies[-1].hp)}', spawn_font, BLACK, 60, 480)
+            text_to_screen(f'{int(enemies[-1].hp)}/400', spawn_font, BLACK, 60, 480)
 
 
         if wave_timer != -1:
-            if (wave_num + 1) % 5 != 0:
+            if wave_num not in (4,5):
                 text_to_screen(f'Time until Wave {wave_num+1}: {int(wave_timer)}', wave_timer_font, BLACK, 100, 200)
+            elif wave_num == 5:
+                text_to_screen(f'YOU WON!', wave_timer_font, BLACK, 250, 200)
             else:
                 text_to_screen(f'BOSS INCOMING: {int(wave_timer)}', wave_timer_font, BLACK, 100, 200)
 
-        text_to_screen(f'wave: {wave_num}', my_font, BLACK, 30, 115)
-        text_to_screen(f'score: {p1.score}', my_font, BLACK, 30, 150)
+        text_to_screen(f'Wave: {wave_num}', my_font, BLACK, 30, 115)
+        text_to_screen(f'Score: {p1.score}', my_font, BLACK, 30, 150)
 
 
         if len(Spawn_text) >= 1 and spawn_text_timer > 0:
@@ -1087,16 +1090,16 @@ while running:
     else:
         screen.fill(GRAY)
         if dead:
-            text_to_screen(f'GAME OVER', pause_font, BLACK, 150, 100)
+            text_to_screen(f'GAME OVER', pause_font, BLACK, 170, 100)
         elif win:
-            text_to_screen(f'YOU WIN!', pause_font, BLACK, 150, 100)
+            text_to_screen(f'YOU WIN!', pause_font, BLACK, 180, 100)
         stats_text = [my_font.render(f'{f'    You lasted for {time:.1f} seconds':^40}', True, BLACK) if dead else my_font.render(f'{f'    It took you {time:.1f} seconds to win':^40}', True, BLACK) , 
-                      my_font.render(f'{f'Damage Taken: {p1.max_hp-p1.hp}':<20}{f'Amount Healed: {p1.healed}':>20}', True, BLACK),
+                      my_font.render(f'{f'HP Left: {max(p1.hp,0)}':<25}{f'Amount Healed: {p1.healed}':>20}', True, BLACK),
                       my_font.render(f'{f'Damage Dealt: {p1.damage_dealt}':<20}{f'Enemies Killed: {p1.score}':>24}', True, BLACK),  
-                      my_font.render(f'{f'Slashes: {p1.slashes}':<20}{f'Lunges: {p1.stabs}':>33}', True, BLACK),
+                      my_font.render(f'{f'Slashes: {p1.slashes}':<20}{f'Lunges: {p1.stabs}':>31}', True, BLACK),
                       ]
         for index, stat in enumerate(stats_text):
-            screen.blit(stat, (100, 220 + (40 * (index+1))))
+            screen.blit(stat, (120, 220 + (40 * (index+1))))
     pygame.display.flip()
     if p1.hp <=0 and not dead:
         play_sound('player die')
