@@ -1,5 +1,3 @@
-#add a boss, new enemies (can just be different colors), maybe ranged enemies, maybe a second weapon
-
 import pygame, random, math
 pygame.init()
 WIDTH, HEIGHT = 800, 600
@@ -72,7 +70,7 @@ enemy_frames = [
     for x,y in enumerate(enemy1_sheets)
     ]
 medkit_frames = [pygame.transform.scale(medkit_sheet.subsurface((i*MW,0,MW,MH)), (MW*SCALE,MH*SCALE)) for i in range(MEDKIT_FRAMES)]
-boss_frames = [pygame.transform.scale(boss_sheet.subsurface((i*BOSSW,0,BOSSW,BOSSH)), (BOSSW*SCALE,BOSSH*SCALE)) for i in range(BOSS_FRAMES)]
+boss_frames = [pygame.transform.scale(boss_sheet.subsurface((i*BOSSW,0,BOSSW,BOSSH)), (BOSSW*SCALE*1.5,BOSSH*SCALE*1.5)) for i in range(BOSS_FRAMES)]
 boss_frames = [pygame.transform.flip(f, True, False) for f in boss_frames]
 
 
@@ -103,7 +101,7 @@ tiles = [
 ]
 
 wave_timer = -1
-wave_num = 1
+wave_num = 4
 
 # Calculate map dimensions in pixels
 map_width = len(grid[0]) * TILE
@@ -119,8 +117,8 @@ def draw_tiles(grid, camera):
             if tile != 0:
                 x = col_i * TILE - camera.x
                 y = row_i * TILE - camera.y
-                if camera_rect.colliderect(pygame.Rect(col_i * TILE, row_i * TILE, TILE, TILE)):
-                    screen.blit (tiles[tile], (x,y))
+
+                screen.blit (tiles[tile], (x,y))
 
 def get_tile_rects(grid):
     rects = []
@@ -169,8 +167,9 @@ def add_enemies(enemy_list, amount):
             amount -= 1
     return enemy_list
 
-def add_boss(enemy_list, amount):
-    enemy_list.append(Enemy(True, boss_frames, random.randint(int(len(rows)*.4),int(len(rows)*.6))*TILE, (index+2) * TILE - (EH * SCALE), patrol_left=random.randint(int(len(rows)*.1),int(len(rows)*.4))*TILE, patrol_right=random.randint(int(len(rows)*.6),int(len(rows)*.9))*TILE))
+def add_boss(enemy_list):
+    enemy_list.append(Enemy(True, boss_frames, 0, 2, patrol_left=0, patrol_right=0))
+    return enemy_list
 
 
 def text_to_screen(text, font, color, x, y):
@@ -183,6 +182,74 @@ spawn_text_timer = 1.5
 #creates text that shows when upgrades spawn
 def spawn_text(type, font, color):
     Spawn_text.append(font.render(f'A {type} has spawned!', False, color))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LASER CLASS
+# Represents a vertical laser beam that telegraphs before firing.
+# Lasers are stored in the global `lasers` list and drawn after all world
+# objects but before the UI so they always appear on top of terrain/enemies.
+# ─────────────────────────────────────────────────────────────────────────────
+class Laser:
+    WARNING_DURATION = 1   # seconds the thin warning line shows before firing
+    ACTIVE_DURATION  = 1.5   # seconds the full beam stays active
+    BEAM_WIDTH       = 40    # pixel width of the active beam
+    DAMAGE           = 1    # HP taken if the player is inside the beam
+
+    def __init__(self, x):
+        self.x     = x           # world-space X position of the beam centre
+        self.timer = 0.0
+        self.state = "warning"   # "warning" → "active" → "done"
+        self.hit_player = False  # so we only deal damage once per activation
+
+    def update(self, dt):
+        self.timer += dt
+
+        if self.state == "warning":
+            # When the warning period expires, switch to the active (firing) state
+            if self.timer >= self.WARNING_DURATION:
+                self.state = "active"
+                self.timer = 0.0
+                self.hit_player = False  # reset hit flag for this pulse
+
+        elif self.state == "active":
+            # Check whether the player is standing inside the beam (one hit per pulse)
+            if not self.hit_player and p1.kb_x > 0:
+                beam_rect = pygame.Rect(
+                    self.x - self.BEAM_WIDTH // 2, 0,
+                    self.BEAM_WIDTH, map_height
+                )
+                if beam_rect.colliderect(p1.get_rect()):
+                    p1.hp -= self.DAMAGE
+                    if p1.hp > 0:
+                        play_sound("player hit")
+
+            # Beam turns off after its active duration
+            if self.timer >= self.ACTIVE_DURATION:
+                self.state = "done"
+
+    def draw(self, surface, camera):
+        screen_x = int(self.x - camera.x)
+
+        if self.state == "warning":
+            # Pulsing orange/yellow line so the player knows where to dodge
+            pulse = 0.5 + 0.5 * math.sin(self.timer * 10)   # flicker effect
+            color = (255, int(80 + 120 * pulse), 0)
+            pygame.draw.line(surface, color, (screen_x, 0), (screen_x, HEIGHT), int(self.BEAM_WIDTH/2))
+            # Small indicator triangle/block at the bottom edge
+            pygame.draw.rect(surface, color,
+                             pygame.Rect(screen_x - 6, HEIGHT - 16, 12, 16))
+
+        elif self.state == "active":
+            # Outer glow (wider, lighter)
+            pygame.draw.line(surface, (255, 200, 200),
+                             (screen_x, 0), (screen_x, HEIGHT),
+                             self.BEAM_WIDTH + 8)
+            # Core beam (bright red)
+            pygame.draw.line(surface, (255, 50, 50),
+                             (screen_x, 0), (screen_x, HEIGHT),
+                             self.BEAM_WIDTH)
+
 
 class Player:
     def __init__(self): #__init__ means initialize self is the characyer
@@ -430,8 +497,8 @@ class Enemy:
         if not self.is_Boss:
             self.x, self.y = x, platform-2*EH
         else:
-            self.x = WIDTH - BOSSW/2
-            self.y = 0
+            self.x = WIDTH - BOSSW/2 +600
+            self.y = -100
         self.facing_right = True
         self.frame = 0
         self.anim_timer = 0
@@ -458,9 +525,30 @@ class Enemy:
             self.state = "accel"  # accel, walk, decel
         else:
             self.phase = 1
-            self.hp = 200
+            self.hp = 400
             self.dam = 20
             frames = [range(BOSS_FRAMES)]
+
+            self.vx               = 0.0    # current horizontal velocity (px/s)
+            self.vy               = 0.0    # current vertical velocity (px/s)
+            self.push_timer       = 0.0    # drives the oscillating speed rhythm
+            self.base_speed       = 200.0  # max speed; increases after laser phase
+            self.phase2_entered   = False  # True once phase 2 setup has run
+            self.retreating       = False  # True while boss flies back to spawn
+            self.start_x          = self.x # original spawn X (used for retreat)
+            self.start_y          = self.y # original spawn Y
+            self.laser_round      = 0      # how many laser rounds have completed
+            self.max_laser_rounds = 3      # total laser rounds before speed boost
+            # "idle"     → not yet in laser phase
+            # "warning"  → lasers are showing the warning line
+            # "active"   → lasers are firing
+            # "cooldown" → brief pause between rounds
+            # "done"     → all rounds finished, back to chasing
+            self.laser_round_state    = "idle"
+            self.laser_cooldown_timer = 0.0  # timer between laser rounds
+            self.speed_boosted        = False # True once we've applied the boost
+
+
     def take_hit(self, damage):
         self.hp -= damage
         p1.damage_dealt += damage
@@ -473,8 +561,25 @@ class Enemy:
         self.last_hit = 0
     
     def get_rect(self):
-        return pygame.Rect(self.x+40, self.y+3, (EW * SCALE)-70, (EH * SCALE)+5) if not self.is_Boss else  pygame.Rect(self.x, self.y, (BOSSW * SCALE), (BOSSH * SCALE))
-    
+        if not self.is_Boss:
+            return pygame.Rect(self.x + 40, self.y + 3, (EW * SCALE) - 75, (EH * SCALE) + 5)
+        else:
+            return pygame.Rect((self.x+70), self.y+70, BOSSW * SCALE-50, BOSSH * SCALE-50)
+
+    # ── Boss helper: spawn evenly-spaced lasers across the full map ──────────
+    def _spawn_lasers(self):
+        """Create vertical Laser objects spread across the map width.
+        The gaps between lasers are the safe zones the player must dodge into."""
+        global lasers
+        lasers.clear()
+        num_lasers = 20  # number of beams per round
+        # Divide the map into (num_lasers + 1) equal segments so the beams
+        # land at the segment boundaries, leaving wide safe corridors between them.
+        offset = random.randint(0,100)
+        for i in range(1, num_lasers + 1):
+            world_x = int(map_width * i / (num_lasers + 1))
+            lasers.append(Laser(world_x+offset))
+
     def update(self, dt):
 
         self.new_facing_right = self.facing_right
@@ -568,12 +673,121 @@ class Enemy:
                         self.frame = 1
             self.facing_right = self.new_facing_right
         else:
-            self.facing_right = True if self.x<p1.x else False
+            # ── Boss always faces the player ─────────────────────────────────
+            self.facing_right = True if self.x < p1.x else False
 
-            if self.hp <= 100:
-                self.phase = 2
 
-            
+
+            # ── Phase 2 entry: triggered at half health ───────────────────────
+            if self.hp <= 200 and not self.phase2_entered:
+                self.phase          = 2
+                self.phase2_entered = True
+                self.retreating     = True   # start flying back to origin
+
+            # ── RETREAT: boss flies back to its starting position ─────────────
+            if self.retreating:
+                dx   = self.start_x - self.x
+                dy   = self.start_y - self.y
+                dist = math.sqrt(dx*dx + dy*dy) or 1
+
+                # Move quickly back; 200 px/s feels purposeful without teleporting
+                retreat_speed = 200.0
+                self.x += (dx / dist) * retreat_speed * dt
+                self.y += (dy / dist) * retreat_speed * dt
+
+                # Close enough → snap and start the first laser round
+                if dist < 20:
+                    self.x, self.y         = self.start_x, self.start_y
+                    self.retreating        = False
+                    self.laser_round       = 0
+                    self.laser_round_state = "warning"
+                    self._spawn_lasers()   # fill global `lasers` list
+
+                # Animate during retreat
+                self.anim_timer += dt
+                if self.anim_timer >= 1 / 8:
+                    self.anim_timer = 0
+                    self.frame += 1
+
+            # ── LASER PHASE: manage rounds of laser attacks ───────────────────
+            elif self.laser_round_state in ("warning", "active", "cooldown"):
+                global lasers
+
+                if self.laser_round_state == "warning":
+                    # Wait for every laser to leave warning (i.e., it has fired or finished)
+                    if all(l.state in ("active", "done") for l in lasers):
+                        self.laser_round_state = "active"
+
+                elif self.laser_round_state == "active":
+                    # Wait for every laser beam to finish firing
+                    if all(l.state == "done" for l in lasers):
+                        self.laser_round += 1
+
+                        if self.laser_round >= self.max_laser_rounds:
+                            # All rounds done: clear beams, speed up, resume chasing
+                            lasers.clear()
+                            self.laser_round_state = "done"
+                            if not self.speed_boosted:
+                                # Significant speed boost makes the final chase dangerous
+                                self.base_speed    *= 1.5
+                                self.speed_boosted = True
+                        else:
+                            # Short pause before spawning the next laser round
+                            self.laser_round_state    = "cooldown"
+                            self.laser_cooldown_timer = 1.5
+
+                elif self.laser_round_state == "cooldown":
+                    self.laser_cooldown_timer -= dt
+                    if self.laser_cooldown_timer <= 0:
+                        # Spawn fresh lasers and go back to warning state
+                        self._spawn_lasers()
+                        self.laser_round_state = "warning"
+
+                # Boss bobs gently in place during the laser attack instead of chasing
+                self.push_timer += dt
+                self.y = self.start_y + math.sin(self.push_timer * 3) * 12
+
+                # Animate
+                self.anim_timer += dt
+                if self.anim_timer >= 1 / 8:
+                    self.anim_timer = 0
+                    self.frame += 1
+
+            # ── NORMAL MOVEMENT: Phase 1 chasing and post-laser Phase 2 ───────
+            else:
+                self.push_timer += dt
+
+                # abs(sin) produces a natural 0→1→0 oscillation.
+                # Offset by 0.15 so the boss never fully stops — it always
+                # drifts a little, then surges, then drifts again, like it's
+                # pushing itself through a thick medium.
+                speed_mult = 0.15 + 0.85 * abs(math.sin(self.push_timer * 1.5))
+
+                # Direction vector from boss to player
+                dx   = p1.x - self.x
+                dy   = p1.y - self.y-100
+                dist = math.sqrt(dx*dx + dy*dy) or 1
+
+                # Compute the velocity we'd like to have this frame
+                target_vx = (dx / dist) * self.base_speed * speed_mult
+                target_vy = (dy / dist) * self.base_speed * speed_mult
+
+                # Smoothly interpolate current velocity toward the target.
+                # A small lerp factor (0.07) gives the floaty, inertia-heavy
+                # feel of something pushing through air rather than snapping to speed.
+                lerp = 0.07
+                self.vx += (target_vx - self.vx) * lerp
+                self.vy += (target_vy - self.vy) * lerp
+
+                # Apply velocity
+                self.x += self.vx * dt
+                self.y += self.vy * dt
+
+                # Animate
+                self.anim_timer += dt
+                if self.anim_timer >= 1 / 8:
+                    self.anim_timer = 0
+                    self.frame += 1
 
     def draw(self, surface, camera):
         if not self.is_Boss:
@@ -595,6 +809,7 @@ class Enemy:
                 img.fill(self.harm, special_flags=pygame.BLEND_RGB_MAX)
 
             surface.blit(img, (self.x - camera.x, self.y - camera.y))
+
 class Upgrade:
     def __init__(self, type, spawn_timer):
         self.type = type
@@ -672,15 +887,19 @@ class Camera:
 # --- Setup ---
 p1 = Player()
 #this was actually written by me!!
-enemies = add_enemies([], 1)
+enemies = add_enemies([],1)
 camera = Camera(300, 0, 0)
 upgrades = [Upgrade("medkit", 5)]
+
+# Global list of active laser beams (populated by the boss in phase 2)
+lasers = []
 
 hitboxes = False
 
 # --- Game loop ---
 running = True
 in_Game = True
+win = False
 dead = False
 paused = False
 time = 0
@@ -713,6 +932,11 @@ while running:
 
         for e in enemies:
             e.update(dt)
+
+        # Update every active laser beam; each Laser handles its own
+        # warning → active → done state transitions and player collision.
+        for l in lasers:
+            l.update(dt)
 
         screen.fill(SKY)
 
@@ -765,7 +989,13 @@ while running:
             wave_timer -=dt
         if wave_timer <=0 and len(enemies) == p1.score:
             wave_num+=1
-            enemies = add_enemies(enemies, .5 + (.5*wave_num))
+            if wave_num % 5 != 0:
+                enemies = add_enemies(enemies, .5 + (.5*wave_num))
+            elif wave_num == 5:
+                enemies = add_boss(enemies)
+            else:
+                in_Game = False
+                win = True
             wave_timer = -1
             
                 
@@ -806,6 +1036,13 @@ while running:
         if attack_rect and hitboxes:
             pygame.draw.rect(screen, CYAN, attack_rect.move(-camera.x, -camera.y), 2) if p1.attack_state != 3 else pygame.draw.rect(screen, GREEN, attack_rect.move(-camera.x, -camera.y), 2)
 
+        # ── Draw laser beams ─────────────────────────────────────────────────
+        # Drawn AFTER all world objects (tiles, enemies, player, upgrades) so
+        # they always appear on top, but BEFORE the UI overlay so the HUD stays
+        # readable over the beams.
+        for l in lasers:
+            l.draw(screen, camera)
+
         #prints text
         text_to_screen(f'lunge cooldown: {p1.stab_cooldown:.1f}', my_font, BLACK, 30, 80)
 
@@ -813,9 +1050,27 @@ while running:
         pygame.draw.rect(screen, GRAY, pygame.Rect(30,30,5*p1.max_hp,50))
         pygame.draw.rect(screen, GREEN if p1.hp > 60  else ORANGE if p1.hp > 30 else RED, pygame.Rect(30,30,5*p1.hp,50))
         pygame.draw.rect(screen, BLACK, pygame.Rect(30,30,5*p1.max_hp,50),5)
-        text_to_screen(f'{p1.hp}', my_font, BLACK, 40, 33)
+        text_to_screen(f'{int(p1.hp)}', my_font, BLACK, 40, 33)
         if wave_timer != -1:
-            text_to_screen(f'Time until Wave {wave_num+1}: {int(wave_timer)}', wave_timer_font, BLACK, 100, 200)
+            if (wave_num + 1) % 5 != 0:
+                text_to_screen(f'Time until Wave {wave_num+1}: {int(wave_timer)}', wave_timer_font, BLACK, 100, 200)
+            else:
+                text_to_screen(f'BOSS INCOMING: {int(wave_timer)}', wave_timer_font, BLACK, 100, 200)
+
+        if wave_num == 5:
+            #boss healthbar (all me)
+            pygame.draw.rect(screen, GRAY, pygame.Rect(50,470,1.75*400,80))
+            pygame.draw.rect(screen, RED, pygame.Rect(50,470,int(1.75*enemies[-1].hp),80))
+            pygame.draw.rect(screen, BLACK, pygame.Rect(50,470,int(1.75*400),80),5)
+            text_to_screen(f'{int(enemies[-1].hp)}', spawn_font, BLACK, 60, 480)
+
+
+        if wave_timer != -1:
+            if (wave_num + 1) % 5 != 0:
+                text_to_screen(f'Time until Wave {wave_num+1}: {int(wave_timer)}', wave_timer_font, BLACK, 100, 200)
+            else:
+                text_to_screen(f'BOSS INCOMING: {int(wave_timer)}', wave_timer_font, BLACK, 100, 200)
+
         text_to_screen(f'wave: {wave_num}', my_font, BLACK, 30, 115)
         text_to_screen(f'score: {p1.score}', my_font, BLACK, 30, 150)
 
@@ -831,8 +1086,11 @@ while running:
             text_to_screen(f"PAUSED", pause_font, BLACK, 250, 150)
     else:
         screen.fill(GRAY)
-        text_to_screen(f'GAME OVER', pause_font, BLACK, 150, 100)
-        stats_text = [my_font.render(f'{f'    You lasted for {time:.1f} seconds':^40}', True, BLACK), 
+        if dead:
+            text_to_screen(f'GAME OVER', pause_font, BLACK, 150, 100)
+        elif win:
+            text_to_screen(f'YOU WIN!', pause_font, BLACK, 150, 100)
+        stats_text = [my_font.render(f'{f'    You lasted for {time:.1f} seconds':^40}', True, BLACK) if dead else my_font.render(f'{f'    It took you {time:.1f} seconds to win':^40}', True, BLACK) , 
                       my_font.render(f'{f'Damage Taken: {p1.max_hp-p1.hp}':<20}{f'Amount Healed: {p1.healed}':>20}', True, BLACK),
                       my_font.render(f'{f'Damage Dealt: {p1.damage_dealt}':<20}{f'Enemies Killed: {p1.score}':>24}', True, BLACK),  
                       my_font.render(f'{f'Slashes: {p1.slashes}':<20}{f'Lunges: {p1.stabs}':>33}', True, BLACK),
