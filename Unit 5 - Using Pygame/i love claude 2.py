@@ -17,6 +17,9 @@ player_hit_s = [pygame.mixer.Sound("player hit.wav"), pygame.mixer.Sound("player
 slash_s = [pygame.mixer.Sound("SWORD 1.mp3"), pygame.mixer.Sound("SWORD 3 (non-brutal).mp3")]
 stab_s = [pygame.mixer.Sound("SWORD 2 (brutal).mp3"), pygame.mixer.Sound("SWORD 4 (metal).mp3")]
 player_die_s = [pygame.mixer.Sound("player die.wav")]
+laser_charge_s = pygame.mixer.Sound("laser charge.mp3")
+laser_sound = pygame.mixer.Sound("laser shoot.mp3")
+laser_sound.set_volume(.5)
 
 pygame.mixer.music.load('bg music.mp3')
 pygame.mixer.music.set_volume(0.5)
@@ -25,7 +28,7 @@ body_sheet = pygame.image.load("Walking.png").convert_alpha()
 arms_sheet = pygame.image.load("arms.png").convert_alpha()
 enemy1_sheets = [pygame.image.load("Enemy.png").convert_alpha(), pygame.image.load("the scary guy.png").convert_alpha()]
 medkit_sheet = pygame.image.load("medkit.png").convert_alpha()
-boss_sheet = pygame.image.load("th REAL eye 1.png").convert_alpha()
+boss_sheet = pygame.image.load("the REAL RELA eye 1.png").convert_alpha()
 
 SCALE = 2
 
@@ -106,7 +109,7 @@ tiles = [
 ]
 
 wave_timer = -1
-wave_num = 1
+wave_num = 5
 
 # Calculate map dimensions in pixels
 map_width = len(grid[0]) * TILE
@@ -176,6 +179,13 @@ def add_boss(enemy_list):
     enemy_list.append(Enemy(True, boss_frames, 0, 2, patrol_left=0, patrol_right=0))
     return enemy_list
 
+def spawn_wave(enemy_list, wave):
+    if wave != 5:
+        enemy_list = add_enemies(enemy_list, .5 + (.5*wave))
+    elif wave_num == 5:
+        enemy_list = add_boss(enemy_list)
+    return enemy_list
+
 
 def text_to_screen(text, font, color, x, y):
     textt = font.render(text, False, color)
@@ -210,12 +220,15 @@ class Laser:
         self.timer += dt
 
         if self.state == "warning":
+            laser_charge_s.play()
             # When the warning period expires, switch to the active (firing) state
             if self.timer >= self.WARNING_DURATION:
+                laser_charge_s.stop()
                 self.state = "active"
                 self.timer = 0.0
 
         elif self.state == "active":
+            laser_sound.play()
             # Check whether the player is standing inside the beam (one hit per pulse)
 
             beam_rect = pygame.Rect(
@@ -229,6 +242,7 @@ class Laser:
 
             # Beam turns off after its active duration
             if self.timer >= self.ACTIVE_DURATION:
+                laser_sound.stop()
                 self.state = "done"
 
     def draw(self, surface, camera):
@@ -529,7 +543,8 @@ class Enemy:
             self.laser_round_state = "noo" #nromal enemies cant fire lasers
         else:
             self.phase = 1
-            self.hp = 400
+            self.max_hp = 800
+            self.hp = self.max_hp
             self.dam = 20
             frames = [range(BOSS_FRAMES)]
 
@@ -683,7 +698,7 @@ class Enemy:
 
 
             # ── Phase 2 entry: triggered at half health ───────────────────────
-            if self.hp <= 200 and not self.phase2_entered:
+            if self.hp <= self.max_hp//2 and not self.phase2_entered:
                 self.phase          = 2
                 self.phase2_entered = True
                 self.retreating     = True   # start flying back to origin
@@ -891,7 +906,7 @@ class Camera:
 # --- Setup ---
 p1 = Player()
 #this was actually written by me!!
-enemies = add_enemies([],1)
+enemies = spawn_wave([],wave_num)
 camera = Camera(300, 0, 0)
 upgrades = [Upgrade("medkit", 5)]
 
@@ -996,10 +1011,8 @@ while running:
             if wave_num > 5:
                 in_Game = False
                 win = True
-            elif wave_num % 5 != 0:
-                enemies = add_enemies(enemies, .5 + (.5*wave_num))
-            elif wave_num == 5:
-                enemies = add_boss(enemies)
+            else:
+                enemies = spawn_wave(enemies, wave_num)
 
             wave_timer = -1
             
@@ -1059,11 +1072,12 @@ while running:
 
 
         if wave_num == 5:
+            pixelsperhp = 700/enemies[-1].max_hp
             #boss healthbar (all me)
-            pygame.draw.rect(screen, GRAY, pygame.Rect(50,470,1.75*400,80))
-            pygame.draw.rect(screen, RED, pygame.Rect(50,470,int(1.75*enemies[-1].hp),80))
-            pygame.draw.rect(screen, BLACK, pygame.Rect(50,470,int(1.75*400),80),5)
-            text_to_screen(f'{int(enemies[-1].hp)}/400', spawn_font, BLACK, 60, 480)
+            pygame.draw.rect(screen, GRAY, pygame.Rect(50,470,700,80))
+            pygame.draw.rect(screen, RED, pygame.Rect(50,470,int(pixelsperhp*enemies[-1].hp),80))
+            pygame.draw.rect(screen, BLACK, pygame.Rect(50,470,int(700),80),5)
+            text_to_screen(f'{int(enemies[-1].hp)}/{enemies[-1].max_hp}', spawn_font, BLACK, 60, 480)
 
 
         if wave_timer != -1:
