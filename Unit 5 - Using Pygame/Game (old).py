@@ -1,0 +1,848 @@
+#add a boss, new enemies (can just be different colors), maybe ranged enemies, maybe a second weapon
+
+import pygame, random, math
+pygame.init()
+WIDTH, HEIGHT = 800, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+clock = pygame.time.Clock()
+pygame.display.set_caption("Save your grandma pls")
+#setup sound
+pygame.mixer.init()
+jump = [pygame.mixer.Sound("jump.wav"), pygame.mixer.Sound("jump2.wav")]
+hit_s = [pygame.mixer.Sound("hit1.wav"), pygame.mixer.Sound("hit2.wav")]
+pause_s = [pygame.mixer.Sound("pause sound.wav"), pygame.mixer.Sound("pause2.wav")]
+die_s = [pygame.mixer.Sound("die.wav"),pygame.mixer.Sound("die2.wav"), pygame.mixer.Sound("die3.wav")]
+upgrade_s = [pygame.mixer.Sound("upgrade1.wav"), pygame.mixer.Sound("upgrade2.wav")]
+player_hit_s = [pygame.mixer.Sound("player hit.wav"), pygame.mixer.Sound("player hit2.wav")]
+slash_s = [pygame.mixer.Sound("SWORD 1.mp3"), pygame.mixer.Sound("SWORD 3 (non-brutal).mp3")]
+stab_s = [pygame.mixer.Sound("SWORD 2 (brutal).mp3"), pygame.mixer.Sound("SWORD 4 (metal).mp3")]
+player_die_s = [pygame.mixer.Sound("player die.wav")]
+
+pygame.mixer.music.load('bg music.mp3')
+pygame.mixer.music.set_volume(0.5)
+# --- Load assets ---
+body_sheet = pygame.image.load("Walking.png").convert_alpha()
+arms_sheet = pygame.image.load("arms.png").convert_alpha()
+enemy1_sheets = [pygame.image.load("Enemy.png").convert_alpha(), pygame.image.load("the scary guy.png").convert_alpha()]
+medkit_sheet = pygame.image.load("medkit.png").convert_alpha()
+boss_sheet = pygame.image.load("th REAL eye 1.png").convert_alpha()
+
+SCALE = 2
+
+BODY_FRAMES = 10
+ARM_FRAMES = 17
+ENEMY_FRAMES = 7
+MEDKIT_FRAMES = 5
+BOSS_FRAMES = 8
+BW = body_sheet.get_width() // BODY_FRAMES
+BH = body_sheet.get_height()
+AW = arms_sheet.get_width() // ARM_FRAMES
+AH = arms_sheet.get_height()
+EW = enemy1_sheets[0].get_width() // ENEMY_FRAMES
+EH = enemy1_sheets[0].get_height()
+MW = medkit_sheet.get_width() // MEDKIT_FRAMES
+MH = medkit_sheet.get_height()
+BOSSW = boss_sheet.get_width() // BOSS_FRAMES
+BOSSH = boss_sheet.get_height()
+
+#colors
+WHITE = (255,255,255)
+SKY = (1, 183, 238)
+BLACK = (0,0,0)
+RED = (255,0,0)
+GREEN = (0,255,0)
+BLUE = (0,0,255)
+ORANGE = (250,150,20)
+GRAY = (130,130,130)
+CYAN = (0,255,255)
+
+#font
+pygame.font.init()
+my_font = pygame.font.SysFont('Comic Sans MS', 30)
+spawn_font = pygame.font.SysFont('Comic Sans MS', 40)
+wave_timer_font = pygame.font.SysFont('Comic Sans MS', 60)
+pause_font = pygame.font.SysFont('Comic Sans MS', 80)
+
+#sets up frames
+enemy1_sheets[0].set_colorkey((0, 0, 0))
+body_frames = [pygame.transform.scale(body_sheet.subsurface((i*BW,0,BW,BH)), (BW*SCALE,BH*SCALE)) for i in range(BODY_FRAMES)]
+arms_frames = [pygame.transform.scale(arms_sheet.subsurface((i*AW,0,AW,AH)), (AW*SCALE,AH*SCALE)) for i in range(ARM_FRAMES)]
+enemy_frames = [
+    [pygame.transform.scale(enemy1_sheets[x].subsurface((i*EW,0,EW,EH)), (EW*SCALE,EH*SCALE)) for i in range(ENEMY_FRAMES)]
+    for x,y in enumerate(enemy1_sheets)
+    ]
+medkit_frames = [pygame.transform.scale(medkit_sheet.subsurface((i*MW,0,MW,MH)), (MW*SCALE,MH*SCALE)) for i in range(MEDKIT_FRAMES)]
+boss_frames = [pygame.transform.scale(boss_sheet.subsurface((i*BOSSW,0,BOSSW,BOSSH)), (BOSSW*SCALE,BOSSH*SCALE)) for i in range(BOSS_FRAMES)]
+boss_frames = [pygame.transform.flip(f, True, False) for f in boss_frames]
+
+
+#flipped frames
+body_frames_flipped = [pygame.transform.flip(f, True, False) for f in body_frames]
+arms_frames_flipped = [pygame.transform.flip(f, True, False) for f in arms_frames]
+boss_frames_flipped = [pygame.transform.flip(f, True, False) for f in boss_frames]
+enemy_frames_flipped = [[pygame.transform.flip(x, True, False) for x in f]for f in enemy_frames]
+
+# Attack animation indices
+slash1 = [11, 12, 13]
+slash2 = [14, 15]
+stab   = [8, 9, 10]
+
+grid = []
+with open("map.tile") as f:
+    for line in f:
+        row = [int(ch) for ch in line.strip()]
+        grid.append(row)
+TILE = 32 * SCALE
+GROUND = (len(grid) - 1) * TILE - (BH * SCALE)
+BG = pygame.transform.scale(pygame.image.load("backgroundv.2.png"), (800*4, 600*4))
+
+tiles = [
+    "",
+    pygame.transform.scale(pygame.image.load("blue dark tile.png"), (TILE, TILE)),
+    pygame.transform.scale(pygame.image.load("blue light tile.png"), (TILE, TILE))
+]
+
+wave_timer = -1
+wave_num = 1
+
+# Calculate map dimensions in pixels
+map_width = len(grid[0]) * TILE
+map_height = len(grid) * TILE
+
+def draw_tiles(grid, camera):
+    x=0
+    y=0
+    camera_rect = camera.get_rect()
+    for row_i, row in enumerate(grid): 
+        y=-camera.y
+        for col_i, tile in enumerate(row):
+            if tile != 0:
+                x = col_i * TILE - camera.x
+                y = row_i * TILE - camera.y
+                if camera_rect.colliderect(pygame.Rect(col_i * TILE, row_i * TILE, TILE, TILE)):
+                    screen.blit (tiles[tile], (x,y))
+
+def get_tile_rects(grid):
+    rects = []
+    for row_i, row in enumerate(grid):
+        for col_i, tile in enumerate(row):
+            if tile != 0:
+                rects.append(pygame.Rect(col_i * TILE, row_i * TILE, TILE, TILE))
+    return rects
+
+def play_sound(type):
+    if type == "die":
+        die_s[random.randint(0, len(die_s) -1)].play()
+    if type == "enemy hit":
+        hit_s[random.randint(0, len(hit_s) -1)].play()
+    if type == "player hit":
+        player_hit_s[random.randint(0, len(player_hit_s) -1)].play()
+    if type == "pause_s":
+        pause_s[random.randint(0, len(pause_s) -1)].play()
+    if type == "jump":
+        jump[random.randint(0, len(jump) -1)].play()
+    if type == "upgrade":
+        upgrade_s[random.randint(0, len(upgrade_s)-1)].play()
+    if type == "slash":
+        slash_s[random.randint(0, len(slash_s) -1)].play()
+    if type == "stab":
+        stab_s[random.randint(0, len(stab_s) -1)].play()
+    if type == "player die":
+        player_die_s[random.randint(0, len(player_die_s) -1)].play()
+
+
+def add_enemies(enemy_list, amount):
+    #if you input a decimal amount, the extra decimal will be the chance for a second enemy to spawn
+    if amount - int(amount) != 0:
+        chance = (amount - int(amount))*100
+    else:
+        chance = 0
+    amount = int(amount)
+    for index, rows in enumerate(grid):
+        extra = random.randint(0,100) <= chance and chance != 0
+        if extra:
+            amount +=1
+        for x in range(amount):
+            if "1" in str(rows):
+                enemy_list.append(Enemy(False, random.randint(0,len(enemy1_sheets)-1), random.randint(int(len(rows)*.4),int(len(rows)*.6))*TILE, (index+2) * TILE - (EH * SCALE), patrol_left=random.randint(int(len(rows)*.1),int(len(rows)*.4))*TILE, patrol_right=random.randint(int(len(rows)*.6),int(len(rows)*.9))*TILE))
+        if extra:
+            amount -= 1
+    return enemy_list
+
+def add_boss(enemy_list, amount):
+    enemy_list.append(Enemy(True, boss_frames, random.randint(int(len(rows)*.4),int(len(rows)*.6))*TILE, (index+2) * TILE - (EH * SCALE), patrol_left=random.randint(int(len(rows)*.1),int(len(rows)*.4))*TILE, patrol_right=random.randint(int(len(rows)*.6),int(len(rows)*.9))*TILE))
+
+
+def text_to_screen(text, font, color, x, y):
+    textt = font.render(text, False, color)
+    screen.blit(textt, (x, y))
+
+Spawn_text = []
+spawn_text_timer = 1.5
+
+#creates text that shows when upgrades spawn
+def spawn_text(type, font, color):
+    Spawn_text.append(font.render(f'A {type} has spawned!', False, color))
+
+class Player:
+    def __init__(self): #__init__ means initialize self is the characyer
+        self.x, self.y = WIDTH // 2, GROUND
+        self.speed = 4
+        self.max_speed = 0
+        self.facing_right = True
+        self.y_vel = 0
+        self.on_ground = False
+        self.moving = False
+        self.hit = False
+        self.last_hit = 0
+        self.hit_enemies = set()
+        self.kb_x = 0
+        self.kb_y = 0
+        self.max_hp = 100
+        self.hp = self.max_hp
+        self.harm = RED
+        self.stab_cooldown = 0
+        self.gravity = .7
+        self.lunge_power = 10
+        self.knockback_x=10
+        self.knockback_y=7
+        self.jump = -20
+
+        self.frame = 0
+        self.anim_timer = 0
+        self.damage_dealt = 0
+        self.healed = 0
+
+
+        self.slashes = 0
+        self.stabs = 0
+        self.score = 0
+        self.attacking = False
+        self.attack_state = 0
+        self.attack_frame = 0
+        self.attack_timer = 0
+        self.attack_speed = .1
+
+    def handle_event(self, event):
+        #event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and not self.attacking:
+            play_sound("slash")
+            # cycle between slash1 and slash2
+            if self.attack_state == 1:
+                self.slashes +=1
+                self.attack_state = 2
+            else:
+                self.slashes+=1
+                self.attack_state = 1
+            self.attacking = True
+            self.attack_frame = 0
+            self.attack_timer = 0
+            self.hit_enemies = set()
+
+        # Stab
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_LSHIFT and self.stab_cooldown <= 0.07:
+            play_sound("stab")
+            self.stabs+=1
+            self.attack_state = 3
+            self.attacking = True
+            self.attack_frame = 0
+            self.attack_timer = 0
+            self.stab_cooldown = 1.2
+            self.hit_enemies = set()
+
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_h:
+            global hitboxes
+            hitboxes = not hitboxes
+        
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            global in_Game, paused
+            play_sound("pause_s")
+            paused = not paused
+            if paused:
+                pygame.mixer.music.pause()
+            else:
+                pygame.mixer.music.unpause()
+            in_Game = not in_Game
+
+        # Jump Start
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_w and self.on_ground:
+                play_sound("jump")
+                self.y_vel = p1.jump  # Initial jump burst
+                self.on_ground = False
+
+                # Variable Jump: If they let go of Space while moving up
+        if event.type == pygame.KEYUP:
+            if event.key == pygame.K_w:
+                if self.y_vel < -3: # If still moving upward significantly
+                    self.y_vel = -3 # "Cut" the jump velocity
+
+    def update(self, dt, keys, tile_rects):
+        #stab cooldown
+        p1.stab_cooldown -=dt
+        if p1.stab_cooldown <= 0:
+            p1.stab_cooldown = 0
+        # --- 1. Horizontal Movement & Collision ---
+        self.moving = False
+        dx = 0
+        if keys[pygame.K_a] and not (self.attacking and self.attack_state == 3 and self.facing_right) and not keys[pygame.K_d]:
+            dx -= self.speed
+            self.facing_right = False
+            self.moving = True
+        if keys[pygame.K_d] and not (self.attacking and self.attack_state == 3 and not self.facing_right) and not keys[pygame.K_a]:
+            dx += self.speed
+            self.facing_right = True
+            self.moving = True
+
+        # Apply X movement (including knockback)
+        self.x += dx + self.kb_x
+            
+        # Check X collisions immediately
+        player_rect = self.get_rect()
+        for tile_rect in tile_rects:
+            if player_rect.colliderect(tile_rect):
+                if (dx + self.kb_x) > 0: # Moving Right
+                    self.x = tile_rect.left - (BW - 40) * SCALE - 40
+                elif (dx + self.kb_x) < 0: # Moving Left
+                    self.x = tile_rect.right - 40
+                self.kb_x = 0 # Stop horizontal momentum on wall hit
+
+
+        # --- 2. Vertical Movement & Collision ---
+        if not self.on_ground:
+            self.y_vel += self.gravity
+        self.y += self.y_vel + self.kb_y
+            
+        # CRITICAL: Assume we are in the air until proven otherwise
+        self.on_ground = False 
+
+        # Re-check rect after X is settled
+        player_rect = self.get_rect() 
+
+        for tile_rect in tile_rects:
+            if player_rect.colliderect(tile_rect):
+                if (self.y_vel + self.kb_y) > 0:  # Falling Down
+                    self.y = tile_rect.top - (BH * SCALE)
+                    self.y_vel = 0
+                    self.kb_y = 0
+                    self.on_ground = True # Found the floor!
+                elif (self.y_vel + self.kb_y) < 0:  # Hitting Ceiling
+                    self.y = tile_rect.bottom
+                    self.y_vel = 0
+                    self.kb_y = 0
+
+        if not self.on_ground:
+            foot_check_rect = self.get_rect()
+            foot_check_rect.y += 1 
+            for tile_rect in tile_rects:
+                if foot_check_rect.colliderect(tile_rect):
+                    self.on_ground = True
+                    break   
+
+        # --- 3. Friction & Animation ---
+        self.kb_x *= 0.8
+        self.kb_y *= 0.9
+        if self.kb_x < .1 and self.kb_x > 0 or self.kb_x > -.1 and self.kb_x < 0:
+            self.kb_x = 0
+        if self.kb_y < .1 and self.kb_y > 0 or self.kb_y > -.1 and self.kb_y < 0:
+            self.kb_y = 0
+            
+        # Animation selection
+        if not self.on_ground:
+            self.frame = 9 # Falling frame
+        elif self.moving:
+            self.anim_timer += dt
+            if self.anim_timer >= .13:
+                self.anim_timer = 0
+                self.frame = (self.frame % 8) + 1
+        else:
+            self.frame = 0
+
+        # Advance attack frame
+        if self.attacking:
+            anim = [slash1, slash2, stab][self.attack_state - 1] 
+            self.attack_timer += dt
+            #attack animation speed
+            if self.attack_timer >= self.attack_speed:
+                self.attack_timer = 0
+                self.attack_frame += 1
+                if self.attack_state == 3:
+                    #pushes the player in direction their facing
+                    self.kb_x = p1.lunge_power if self.facing_right else -p1.lunge_power
+                    #pushing the player up when lunging on the ground helps increase distance but is otherwise unnecessary (this one line was coded by me)
+                    self.kb_y = 1 if not self.on_ground else 0
+                #reset
+                if self.attack_frame >= len(anim):
+                    self.attack_frame = 0
+                    self.attacking = False
+   
+    def get_rect(self):
+        return pygame.Rect(self.x+20*SCALE, self.y, (BW -40)* SCALE, BH * SCALE)
+
+    def get_body(self):
+        return body_frames[self.frame] if self.facing_right else body_frames_flipped[self.frame]
+
+    def get_arms(self):
+        if self.attacking:
+            anim = [slash1, slash2, stab][self.attack_state - 1]
+            idx = anim[min(self.attack_frame, len(anim)-1)]
+        elif not self.on_ground:
+            idx = 16
+        elif self.moving:
+            idx = self.frame % 8
+        else:
+            idx = 0
+        return arms_frames[idx] if self.facing_right else arms_frames_flipped[idx]
+
+    def get_attack_rect(self):
+        if not self.attacking:
+            return None
+        body_width = (BW -40)* SCALE
+        #changes hitboxes if lunging vs if slashing
+        arm_width = 40*SCALE if self.attack_state == 3 else 25*SCALE
+        arm_height = 15*SCALE if self.attack_state == 3 else 30*SCALE
+        if self.facing_right:
+            ax = self.x + body_width*1.5 # in front of player to the right
+        else:
+            ax = self.x if self.attack_state != 3 else self.x - 10*SCALE     # in front of player to the left
+        ay = self.y + 10 * SCALE if self.attack_state != 3 else self.y + 20*SCALE
+        return pygame.Rect(ax, ay, arm_width, arm_height)
+
+    def draw(self, surface, camera):
+        offset_x = -12 if not self.facing_right else 0
+
+        body = self.get_body()
+        arms = self.get_arms()
+        if self.last_hit <.1 and self.hit:
+            harm_body = body.copy()
+            harm_arms = arms.copy()
+            harm_body.fill((self.harm), special_flags=pygame.BLEND_RGB_MAX)
+            harm_arms.fill((self.harm), special_flags=pygame.BLEND_RGB_MAX)
+            surface.blit(harm_body, (self.x - camera.x, self.y - camera.y))
+            surface.blit(harm_arms, (self.x - camera.x + offset_x, self.y - 10 - camera.y))            
+        else:   
+            surface.blit(body, (self.x - camera.x, self.y - camera.y))
+            surface.blit(arms, (self.x - camera.x + offset_x, self.y - 10 - camera.y))
+
+class Enemy:
+    def __init__(self, is_Boss, type, x, platform, patrol_left=200, patrol_right=500):
+        self.is_Boss = is_Boss
+        if not self.is_Boss:
+            self.x, self.y = x, platform-2*EH
+        else:
+            self.x = WIDTH - BOSSW/2
+            self.y = 0
+        self.facing_right = True
+        self.frame = 0
+        self.anim_timer = 0
+        self.speed = 0
+        self.hit = False
+        self.last_hit = 0
+        self.harm = WHITE
+        self.dam = 10
+        self.max_speed = random.randint(15,25)/10
+        self.prev_state = "accel"
+
+        self.type = type
+
+        self.patrol_left = patrol_left
+        self.patrol_right = patrol_right
+
+        if not is_Boss:
+            self.hp = 50
+            self.dam = 10
+            self.accel_frames = [0, 1]
+            self.walk_frames  = [0, 2, 3, 4, 5, 6]
+            self.decel_frames = [1, 0]  # accel frames in reverse
+
+            self.state = "accel"  # accel, walk, decel
+        else:
+            self.phase = 1
+            self.hp = 200
+            self.dam = 20
+            frames = [range(BOSS_FRAMES)]
+    def take_hit(self, damage):
+        self.hp -= damage
+        p1.damage_dealt += damage
+        if self.hp > 0:
+            play_sound("enemy hit")
+        else:
+            p1.score+=1
+            play_sound("die")
+        self.hit = True
+        self.last_hit = 0
+    
+    def get_rect(self):
+        return pygame.Rect(self.x+40, self.y+3, (EW * SCALE)-70, (EH * SCALE)+5) if not self.is_Boss else  pygame.Rect(self.x, self.y, (BOSSW * SCALE), (BOSSH * SCALE))
+    
+    def update(self, dt):
+
+        self.new_facing_right = self.facing_right
+        #hit timer
+        if self.hit:
+            self.last_hit += dt 
+            if self.last_hit >= 0.5:
+                self.hit = False
+                self.last_hit = 0
+        if not self.is_Boss:
+            # Pick anim + speed based on state (this part is probably half ai generated because i got bored)
+
+            close_to_player = abs(self.y - p1.y) < 150 and abs(self.x - p1.x) < 600
+
+            if not close_to_player and self.state == "following":
+                self.state = "accel"
+            if self.state == "decel":
+                self.speed = max(self.speed - 0.5, 0)
+                anim = self.decel_frames
+                if self.speed == 0:
+                    if self.prev_state == "following":
+                        self.new_facing_right = self.x < p1.x
+                        self.state = "following"
+                    else:
+                        self.new_facing_right = not self.facing_right
+                        self.state = "accel"
+                    self.frame = 0
+
+            elif close_to_player:
+                self.state = "following"
+                self.speed = self.max_speed * 1.25 if self.x != p1.x else 0
+                anim = self.walk_frames
+                self.new_facing_right = self.x < p1.x
+                if self.facing_right != self.new_facing_right:
+                    self.prev_state = "following"
+                    self.state = "decel"
+                    self.frame = 0
+
+            elif self.state == "accel":
+                self.speed = min(self.speed + 0.5, self.max_speed)
+                anim = self.accel_frames
+                if self.speed >= 3:
+                    self.state = "walk"
+                    self.frame = 0
+                close_to_edge = (
+                (self.new_facing_right and self.x >= self.patrol_right - 40) or
+                (not self.new_facing_right and self.x <= self.patrol_left + 40)
+                )
+                if close_to_edge:
+                    self.prev_state = "accel"
+                    self.state = "decel"
+                    self.frame = 0
+                elif self.speed >= self.max_speed:
+                    self.state = "walk"
+                    self.frame = 0
+
+            elif self.state == "walk":
+                self.speed = self.max_speed
+                anim = self.walk_frames
+                close_to_edge = (
+                    (self.new_facing_right and self.x >= self.patrol_right - 40) or
+                    (not self.new_facing_right and self.x <= self.patrol_left + 40)
+                )
+                if close_to_edge:
+                    self.prev_state = "walk"
+                    self.state = "decel"
+                    self.frame = 0
+
+            elif self.state == "following":
+                self.speed = self.max_speed * 1.25 if self.x != p1.x else 0
+                anim = self.walk_frames
+                self.new_facing_right = self.x < p1.x
+                if self.facing_right != self.new_facing_right:
+                    self.prev_state = "following"
+                    self.state = "decel"
+                    self.frame = 0
+
+            # Move
+            self.x = self.x + self.speed if self.new_facing_right else self.x - self.speed
+
+            # Animate
+            self.anim_timer += dt #67777
+            if self.anim_timer >= 1/3:
+                if self.facing_right != self.new_facing_right:
+                    self.anim_timer = 0
+                    self.frame = 0
+                else:
+                    self.anim_timer = 0
+                    self.frame += 1
+                    if self.frame >= len(anim):
+                        self.frame = 1
+            self.facing_right = self.new_facing_right
+        else:
+            self.facing_right = True if self.x<p1.x else False
+
+            if self.hp <= 100:
+                self.phase = 2
+
+            
+
+    def draw(self, surface, camera):
+        if not self.is_Boss:
+            anim = self.walk_frames
+
+            idx = anim[min(self.frame, len(anim) - 1)]
+            img = enemy_frames[self.type][idx] if self.facing_right else enemy_frames_flipped[self.type][idx]
+
+            if self.hit and self.last_hit < 0.1:
+                img = img.copy()
+                img.fill(self.harm, special_flags=pygame.BLEND_RGB_MAX)
+
+            surface.blit(img, (self.x - camera.x, self.y - camera.y))
+        else:
+            img = boss_frames[self.frame%BOSS_FRAMES - 1] if self.facing_right else boss_frames_flipped[self.frame%BOSS_FRAMES - 1]
+
+            if self.hit and self.last_hit < 0.1:
+                img = img.copy()
+                img.fill(self.harm, special_flags=pygame.BLEND_RGB_MAX)
+
+            surface.blit(img, (self.x - camera.x, self.y - camera.y))
+class Upgrade:
+    def __init__(self, type, spawn_timer):
+        self.type = type
+        self.frame = 0
+        self.anim_timer = 0
+        self.spawn_timer = spawn_timer
+
+        self.x = 0
+        self.y = 0
+
+        #medkit
+        self.medkit_heal = 20
+        if self.type == "medkit":
+            self.spawn_timer += 10
+
+    def update(self,dt, grid):
+        self.anim_timer += dt
+        if self.anim_timer >= .2:
+            self.frame +=1
+            self.anim_timer = 0
+
+        if self.spawn_timer >0:
+            self.spawn_timer -= dt
+        elif self.x == 0 and self.y == 0:
+            spawn_text("medkit", spawn_font, GREEN)
+            self.spawn(grid)
+
+    def get_rect(self):
+        return pygame.Rect(self.x, self.y, (MW * SCALE), (MH * SCALE))
+
+    def touch(self):
+        play_sound("upgrade")
+        if self.type == "medkit":
+            p1.healed += min(self.medkit_heal, p1.max_hp - p1.hp)
+            p1.hp = min(p1.hp + self.medkit_heal, p1.max_hp)
+            self.spawn_timer = 10
+        
+        self.x, self.y = 0,0
+
+    def spawn(self, grid):
+        found = False
+        while found == False:
+            coordinate_y = random.randint(1,len(grid)-1)
+            coordinate_x = random.randint(0, len(grid[coordinate_y])-1)
+            if grid[coordinate_y][coordinate_x] == 0 and grid[coordinate_y+1][coordinate_x] != 0:
+                found = True
+        self.x = coordinate_x*TILE + 5
+        self.y = coordinate_y*TILE
+
+    def draw(self, surface, camera):
+        img = medkit_frames[self.frame%MEDKIT_FRAMES - 1]
+        surface.blit(img, (self.x - camera.x, self.y - camera.y))
+
+class Camera:
+    def  __init__(self, margin_x, x, y):
+        self.margin_x = margin_x
+        self.x = x
+        self.y = y
+    def update(self):
+        if p1.x - self.x < self.margin_x:
+            self.x = p1.x - self.margin_x
+        elif p1.x - self.x > WIDTH - self.margin_x:
+            self.x = p1.x - (WIDTH - self.margin_x)
+        self.y = p1.y - HEIGHT // 2
+
+        # --- NEW: Clamp Camera to Map Edges ---
+        # Keep X between 0 and (Map Width - Screen Width)
+        self.x = max(0, min(self.x, map_width - WIDTH))
+
+    def get_rect(self):
+        global WIDTH, HEIGHT
+        return pygame.Rect(self.x, self.y, (WIDTH), (HEIGHT))
+
+
+# --- Setup ---
+p1 = Player()
+#this was actually written by me!!
+enemies = add_enemies([], 1)
+camera = Camera(300, 0, 0)
+upgrades = [Upgrade("medkit", 5)]
+
+hitboxes = False
+
+# --- Game loop ---
+running = True
+in_Game = True
+dead = False
+paused = False
+time = 0
+tile_rects = get_tile_rects(grid)
+
+
+pygame.mixer.music.play(loops=-1)
+
+while running:
+    if in_Game:
+        past_x = p1.x
+        past_y = p1.y
+        
+        #delta time (converts frames to seconds by showing seconds per frame)
+        dt = clock.tick(60) / 1000
+        time += dt
+        keys = pygame.key.get_pressed()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            p1.handle_event(event)
+
+        p1.update(dt, keys, tile_rects)
+
+        for u in upgrades:
+            u.update(dt, grid)
+        
+        camera.update()
+
+        for e in enemies:
+            e.update(dt)
+
+        screen.fill(SKY)
+
+        screen.blit(BG, (0-camera.x*.5,-250-camera.y*.5))
+
+        draw_tiles(grid, camera)
+
+        if p1.last_hit >= .5:
+            p1.hit = False
+            p1.last_hit = 0
+        if p1.hit:
+            p1.last_hit += dt
+        elif p1.kb_x == 0:
+            for e in enemies:
+                if e.hp > 0:
+                    if p1.get_rect().colliderect(e.get_rect()):
+                        p1.hit = True
+                        p1.last_hit = 0
+                        p1.hp-=e.dam
+                        if p1.hp > 0:
+                            play_sound("player hit")
+                        # knock away from enemy
+                        if p1.x > e.x:
+                            p1.kb_x = p1.knockback_x   # knocked right
+                        else:
+                            p1.kb_x = -p1.knockback_x  # knocked left
+                        if p1.on_ground:
+                            p1.kb_y = -p1.knockback_y      # knocked upward      
+        #attack hitbox
+        attack_rect = p1.get_attack_rect()
+        #if there was an attack, check for hits
+        if attack_rect:
+            for e in enemies:
+                if e.hp > 0 and id(e) not in p1.hit_enemies:
+                    if attack_rect.colliderect(e.get_rect()):
+                        p1.hit_enemies.add(id(e))
+                        #does more damage if lunging vs slashing
+                        if p1.attack_state == 3:
+                            e.take_hit(20)
+                        else:
+                            e.take_hit(10)
+
+        for u in upgrades:
+            if p1.get_rect().colliderect(u.get_rect()):
+                u.touch()
+
+        if len(enemies) == p1.score and wave_timer == -1:
+            wave_timer = 5
+        elif len(enemies) == p1.score and wave_timer > 0:
+            wave_timer -=dt
+        if wave_timer <=0 and len(enemies) == p1.score:
+            wave_num+=1
+            enemies = add_enemies(enemies, .5 + (.5*wave_num))
+            wave_timer = -1
+            
+                
+        #calculates speed
+        p1.max_speed = 0 if p1.max_speed == 128 else p1.max_speed
+        p1.speed_x = abs(p1.x - past_x)
+        p1.speed_y = abs(p1.y - past_y)
+        p1.tot_speed = math.sqrt(p1.speed_x**2 + p1.speed_y**2)
+        p1.max_speed = max(p1.max_speed, p1.tot_speed)
+
+    #if not in game
+    else:
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                p1.handle_event(event)        
+            if event.type == pygame.QUIT:
+                running = False
+
+    #drawing ___
+    if (in_Game) or (not in_Game and paused):
+        # draws player and enemies
+        for e in enemies:
+            if e.hp > 0:
+                e.draw(screen, camera)
+                if hitboxes:
+                    pygame.draw.rect(screen, RED, e.get_rect().move(-camera.x, -camera.y), 2)
+        
+        for u in upgrades:
+            if u.x != 0 or u.y != 0:
+                u.draw(screen, camera)
+                if hitboxes:
+                    pygame.draw.rect(screen, GREEN, u.get_rect().move(-camera.x, -camera.y), 2)
+        p1.draw(screen, camera)
+
+        if hitboxes:
+            pygame.draw.rect(screen, RED, p1.get_rect().move(-camera.x, -camera.y), 2)
+
+        if attack_rect and hitboxes:
+            pygame.draw.rect(screen, CYAN, attack_rect.move(-camera.x, -camera.y), 2) if p1.attack_state != 3 else pygame.draw.rect(screen, GREEN, attack_rect.move(-camera.x, -camera.y), 2)
+
+        #prints text
+        text_to_screen(f'lunge cooldown: {p1.stab_cooldown:.1f}', my_font, BLACK, 30, 80)
+
+        #healthbar (all me)
+        pygame.draw.rect(screen, GRAY, pygame.Rect(30,30,5*p1.max_hp,50))
+        pygame.draw.rect(screen, GREEN if p1.hp > 60  else ORANGE if p1.hp > 30 else RED, pygame.Rect(30,30,5*p1.hp,50))
+        pygame.draw.rect(screen, BLACK, pygame.Rect(30,30,5*p1.max_hp,50),5)
+        text_to_screen(f'{p1.hp}', my_font, BLACK, 40, 33)
+        if wave_timer != -1:
+            text_to_screen(f'Time until Wave {wave_num+1}: {int(wave_timer)}', wave_timer_font, BLACK, 100, 200)
+        text_to_screen(f'wave: {wave_num}', my_font, BLACK, 30, 115)
+        text_to_screen(f'score: {p1.score}', my_font, BLACK, 30, 150)
+
+
+        if len(Spawn_text) >= 1 and spawn_text_timer > 0:
+            screen.blit(Spawn_text[0], (200,500))
+            spawn_text_timer -= dt
+        elif len(Spawn_text) != 0 and spawn_text_timer <=0:
+            del Spawn_text[0]
+            spawn_text_timer = 1.5
+
+        if not in_Game and paused:
+            text_to_screen(f"PAUSED", pause_font, BLACK, 250, 150)
+    else:
+        screen.fill(GRAY)
+        text_to_screen(f'GAME OVER', pause_font, BLACK, 150, 100)
+        stats_text = [my_font.render(f'{f'    You lasted for {time:.1f} seconds':^40}', True, BLACK), 
+                      my_font.render(f'{f'Damage Taken: {p1.max_hp-p1.hp}':<20}{f'Amount Healed: {p1.healed}':>20}', True, BLACK),
+                      my_font.render(f'{f'Damage Dealt: {p1.damage_dealt}':<20}{f'Enemies Killed: {p1.score}':>24}', True, BLACK),  
+                      my_font.render(f'{f'Slashes: {p1.slashes}':<20}{f'Lunges: {p1.stabs}':>33}', True, BLACK),
+                      ]
+        for index, stat in enumerate(stats_text):
+            screen.blit(stat, (100, 220 + (40 * (index+1))))
+    pygame.display.flip()
+    if p1.hp <=0 and not dead:
+        play_sound('player die')
+        in_Game = False
+        dead = True
+
+pygame.quit()
