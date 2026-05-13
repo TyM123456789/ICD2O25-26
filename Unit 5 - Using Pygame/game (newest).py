@@ -1,3 +1,6 @@
+#fix end screen buttons and change start screen logo (make eye blink, flash different background, etc.)
+#playtest boss and make better
+
 import pygame, random, math
 pygame.init()
 WIDTH, HEIGHT = 800, 600
@@ -113,8 +116,37 @@ tiles = [
     pygame.transform.scale(pygame.image.load("blue light tile.png"), (TILE, TILE))
 ]
 
-wave_timer = -1
-wave_num = 5
+def start_game():
+    global p1, lasers, eye_lasers, grid, tile_rects, map_height, map_width
+    global wave_num, wave_timer, enemies, upgrades, camera, time, hitboxes
+    global dead, win, paused, in_Game, start_Screen, menu_state, Spawn_text, spawn_text_timer
+    global just_Started, start_screen_frame, picture_frame_time
+
+    p1 = Player()
+    lasers = []
+    eye_lasers = []
+    grid, tile_rects, map_height, map_width = get_grid("map.tile")
+    wave_num = 5
+    wave_timer = -1
+    enemies = spawn_wave([], wave_num)
+    upgrades = [Upgrade("medkit", 5)]
+    camera = Camera(300, 0, 0)
+    Spawn_text = []
+    time = 0
+    dead = False
+    win = False
+    paused = False
+    hitboxes = False
+    menu_state = 'main'
+    in_Game = False
+    start_Screen = True
+    just_Started = False
+    spawn_text_timer = 1.5
+    start_screen_frame = 1
+    picture_frame_time = 0
+    pygame.mixer.music.stop()
+    pygame.mixer.music.load('menu music.mp3')
+    pygame.mixer.music.play(loops=-1)
 
 def get_grid(map):
     grid = []
@@ -168,7 +200,6 @@ def play_sound(type):
     if type == "player die":
         player_die_s[random.randint(0, len(player_die_s) -1)].play()
 
-
 def add_enemies(enemy_list, amount):
     #if you input a decimal amount, the extra decimal will be the chance for a second enemy to spawn
     if amount - int(amount) != 0:
@@ -202,13 +233,9 @@ def text_to_screen(text, font, color, x, y):
     textt = font.render(text, False, color)
     screen.blit(textt, (x, y))
 
-Spawn_text = []
-spawn_text_timer = 1.5
-
 #creates text that shows when upgrades spawn
 def spawn_text(type, font, color):
     Spawn_text.append(font.render(f'A {type} has spawned!', False, color))
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LASER CLASS
@@ -332,7 +359,6 @@ class Laser:
             pygame.draw.line(surface, (255, 200, 200), top_pt, bot_pt, self.BEAM_WIDTH + 8)
             pygame.draw.line(surface, (255, 50, 50),   top_pt, bot_pt, self.BEAM_WIDTH)
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # EYE LASER CLASS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -402,7 +428,6 @@ class EyeLaser:
         elif self.state == "active":
             pygame.draw.line(surface, (255, 200, 200), (sx, sy), (ex2, ey2), self.BEAM_WIDTH + 6)
             pygame.draw.line(surface, (255, 50, 200),  (sx, sy), (ex2, ey2), self.BEAM_WIDTH)
-
 
 class Player:
     def __init__(self):
@@ -1169,33 +1194,9 @@ class Camera:
         global WIDTH, HEIGHT
         return pygame.Rect(self.x, self.y, (WIDTH), (HEIGHT))
     
-
-# --- Setup ---
-p1 = Player()
-
-lasers = []
-eye_lasers = []
-
-hitboxes = False
-
-grid, tile_rects, map_height, map_width = get_grid("map.tile")
-
-enemies = spawn_wave([],wave_num)
-camera = Camera(300, 0, 0)
-upgrades = [Upgrade("medkit", 5)]
-
 # --- Game loop ---
 running = True
-in_Game = False
-start_Screen = True
-just_Started = False
-menu_state = 'main'
-win = False
-dead = False
-paused = False
-time = 0
-start_screen_frame = 1
-picture_frame_time = 0
+start_game()
 
 menu_buttons = {
     'main': [
@@ -1205,14 +1206,15 @@ menu_buttons = {
     ],
     'controls': [
         {"Rect": pygame.Rect(500,475,250,100), "Name": "Back"}
+    ],
+    'end': [
+        {"Rect": pygame.Rect(200,475,250,100), "Name": "Return to Start Screen"},
+        {"Rect": pygame.Rect(500,475,250,100), "Name": "Quit"}
     ]
 }
 
 button_text_offset_x = 20
 button_text_offset_y = 15
-
-pygame.mixer.music.load('menu music.mp3')
-pygame.mixer.music.play(loops=-1)
 
 while running:
     dt = clock.tick(60) / 1000
@@ -1371,7 +1373,7 @@ while running:
         p1.tot_speed = math.sqrt(p1.speed_x**2 + p1.speed_y**2)
         p1.max_speed = max(p1.max_speed, p1.tot_speed)
 
-    else:
+    elif not dead or win:
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 p1.handle_event(event)        
@@ -1464,6 +1466,14 @@ while running:
             text_to_screen(f"PAUSED", pause_font, BLACK, 250, 150)
     
     elif dead or win:
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        click = False
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                click = True
+
         screen.fill(GRAY)
         if dead:
             text_to_screen(f'GAME OVER', pause_font, BLACK, 170, 100)
@@ -1479,6 +1489,21 @@ while running:
                       ]
         for index, stat in enumerate(stats_text):
             screen.blit(stat, (120, 220 + (40 * (index+1))))
+
+        for button in menu_buttons["end"]:
+            if button["Rect"].collidepoint(mouse_x, mouse_y):
+                pygame.draw.rect(screen, RED, button["Rect"])
+                text_to_screen(button["Name"], button_hover_font, BLACK, button["Rect"].x + 10, button["Rect"].y + 10)
+                if click:
+                    if button["Name"] == "Quit":
+                        running = False
+                    elif button["Name"] == "Return to Start Screen":
+                        start_game()
+                        continue
+            else:
+                pygame.draw.rect(screen, GRAY, button["Rect"])
+                text_to_screen(button["Name"], button_font, BLACK, button["Rect"].x + 10, button["Rect"].y + 10)
+            pygame.draw.rect(screen, BLACK, button["Rect"], 5)
 
     pygame.display.flip()
     
