@@ -679,10 +679,15 @@ class Enemy:
             self.decel_frames = [1, 0]
 
             self.state = "accel"
+
             self.laser_round_state = "noo"
+            self.phase = None
+            self.p3_state = "none"
+            self.phase3_entered = False
+
         else:
             self.phase = 1
-            self.max_hp = 20
+            self.max_hp = 10
             self.hp = self.max_hp
             self.dam = 20
             frames = [range(BOSS_FRAMES)]
@@ -730,12 +735,13 @@ class Enemy:
                 self.phase3_entered = True
                 self.p3_state = "p3_retreat"
                 lasers.clear()
-                return
 
-            if self.hp > 0:
+            elif self.hp > 0:
                 play_sound("enemy hit")
-            else:
-                p1.score+=1
+            elif not self.is_Boss or self.p3_state != "p3_retreat":
+                p1.score += 1
+                play_sound("die")
+            elif  self.is_Boss and not self.phase3_entered:
                 play_sound("die")
             self.hit = True
             self.last_hit = 0
@@ -792,8 +798,8 @@ class Enemy:
     def _p3_teleport_to_platform(self):
         found = False
         while not found:
-            coordinate_y = random.randint(1, 16)
-            coordinate_x = random.randint(0, len(grid[coordinate_y]) - 1)
+            coordinate_y = random.randint(1, len(grid) - 2)
+            coordinate_x = random.randint(1, len(grid[coordinate_y]) - 2)  # skip border 2s 
             if (grid[coordinate_y][coordinate_x] == 1 and coordinate_y * 64 < 800):
                 found = True
 
@@ -1208,7 +1214,7 @@ menu_buttons = {
         {"Rect": pygame.Rect(500,475,250,100), "Name": "Back"}
     ],
     'end': [
-        {"Rect": pygame.Rect(200,475,250,100), "Name": "Return to Start Screen"},
+        {"Rect": pygame.Rect(50,475,300,100), "Name": "Return"},
         {"Rect": pygame.Rect(500,475,250,100), "Name": "Quit"}
     ]
 }
@@ -1497,7 +1503,7 @@ while running:
                 if click:
                     if button["Name"] == "Quit":
                         running = False
-                    elif button["Name"] == "Return to Start Screen":
+                    elif button["Name"] == "Return":
                         start_game()
                         continue
             else:
