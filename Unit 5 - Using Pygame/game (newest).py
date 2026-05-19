@@ -461,6 +461,9 @@ class Spear:
         )
 
     def update(self, dt):
+        if win:
+            global spears
+            spears = []
         self.timer += dt
 
         if self.phase == "up":
@@ -763,7 +766,7 @@ class Enemy:
         else:
             self.phase = 1
             #enemy max hp
-            self.max_hp = 20
+            self.max_hp = 10
             self.hp = self.max_hp
             self.dam = 20
             frames = [range(BOSS_FRAMES)]
@@ -1462,6 +1465,12 @@ while running:
 
         if len(enemies) == p1.score and wave_timer == -1:
             wave_timer = 5
+            if wave_num == 5:
+                lasers.clear()
+                eye_lasers.clear()
+                spears.clear()
+                laser_charge_s.stop()
+                laser_sound.stop()
         elif len(enemies) == p1.score and wave_timer > 0:
             wave_timer -=dt
         if wave_timer <=0 and len(enemies) == p1.score:
@@ -1469,11 +1478,6 @@ while running:
             if wave_num > 5:
                 in_Game = False
                 win = True
-                lasers.clear()
-                eye_lasers.clear()
-                spears.clear()
-                laser_charge_s.stop()
-                laser_sound.stop()
             else:
                 enemies = spawn_wave(enemies, wave_num)
 
@@ -1602,8 +1606,8 @@ while running:
         stats_text = [
                       my_font.render(f'{f"    You lasted for {time:.1f} seconds":^40}', True, BLACK) if dead else 
                       my_font.render(f'{f"    It took you {time:.1f} seconds to win":^40}', True, BLACK) , 
-                      my_font.render(f'{f"HP Left: {max(p1.hp,0)}":<25}{f"Amount Healed: {p1.healed}":>20}', True, BLACK) if win else 
-                      my_font.render(f'{f"Wave: {wave_num}":<27}{f"Amount Healed: {p1.healed}":>20}', True, BLACK),
+                      my_font.render(f'{f"HP Left: {max(round(p1.hp,0),0)}":<25}{f"Amount Healed: {round(p1.healed,0)}":>20}', True, BLACK) if win else 
+                      my_font.render(f'{f"Wave: {wave_num}":<27}{f"Amount Healed: {round(p1.healed,0)}":>20}', True, BLACK),
                       my_font.render(f'{f"Damage Dealt: {p1.damage_dealt}":<20}{f"Enemies Killed: {p1.score}":>24}', True, BLACK),  
                       my_font.render(f'{f"Slashes: {p1.slashes}":<20}{f"Lunges: {p1.stabs}":>31}', True, BLACK),
                       ]
