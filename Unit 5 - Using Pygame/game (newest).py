@@ -94,7 +94,9 @@ medkit_frames = [pygame.transform.scale(medkit_sheet.subsurface((i*MW,0,MW,MH)),
 boss_frames = [pygame.transform.scale(boss_sheet.subsurface((i*BOSSW,0,BOSSW,BOSSH)), (BOSSW*SCALE*1.5,BOSSH*SCALE*1.5)) for i in range(BOSS_FRAMES)]
 boss_frames = [pygame.transform.flip(f, True, False) for f in boss_frames]
 
-
+boss_spear = pygame.transform.rotate(
+    pygame.transform.scale(pygame.image.load("spear of long sigma.png"), (280,280)),
+    225)
 #flipped frames
 body_frames_flipped = [pygame.transform.flip(f, True, False) for f in body_frames]
 arms_frames_flipped = [pygame.transform.flip(f, True, False) for f in arms_frames]
@@ -108,7 +110,8 @@ stab   = [8, 9, 10]
 
 TILE = 32 * SCALE
 GROUND = (44 - 1) * TILE - (BH * SCALE) #sixteen is the place on the ground, -1 because index
-BG = pygame.transform.scale(pygame.image.load("backgroundv.2.png"), (800*4, 600*4))
+normal_bg = pygame.transform.scale(pygame.image.load("backgroundv.2.png"), (800*4, 600*4))
+phase_3_bg = pygame.transform.scale(pygame.image.load("background but seig.png"), (800*4, 600*4))
 
 tiles = [
     "",
@@ -117,7 +120,7 @@ tiles = [
 ]
 
 def start_game():
-    global p1, lasers, eye_lasers, grid, tile_rects, map_height, map_width
+    global p1, lasers, eye_lasers, spears, grid, tile_rects, map_height, map_width, BG
     global wave_num, wave_timer, enemies, upgrades, camera, time, hitboxes
     global dead, win, paused, in_Game, start_Screen, menu_state, Spawn_text, spawn_text_timer
     global just_Started, start_screen_frame, picture_frame_time
@@ -125,6 +128,10 @@ def start_game():
     p1 = Player()
     lasers = []
     eye_lasers = []
+    spears = []
+
+    BG = normal_bg
+
     grid, tile_rects, map_height, map_width = get_grid("map.tile")
     wave_num = 5
     wave_timer = -1
@@ -241,16 +248,8 @@ def spawn_text(type, font, color):
 # LASER CLASS
 # ─────────────────────────────────────────────────────────────────────────────
 class Laser:
-    WARNING_DURATION   = 0.35
-    ACTIVE_DURATION    = 0.8
-    # Horizontal lasers use their own longer duration and skip sound entirely
-    H_WARNING_DURATION = 1.2
-    H_ACTIVE_DURATION  = 4.0
-    BEAM_WIDTH         = 40
-    DAMAGE             = 1
-
     def __init__(self, x, angle=90, warning=True, permanent=False, sound=False,
-                 horizontal=False, world_y=None):
+                 horizontal=False, world_y=None, active_duration = 0.8, warning_duration = 0.45):
         self.x         = x
         self.angle     = angle
         self.warning   = warning
@@ -262,14 +261,17 @@ class Laser:
         self.horizontal = horizontal
         self.world_y    = world_y
 
-        if self.horizontal:
-            self.sound = False
+        self.warning_duration = warning_duration
+        self.active_duration    = active_duration
+
+        self.width         = 40
+        self.dam             = 2/3
 
     def update(self, dt):
         self.timer += dt
 
-        warn_dur   = self.H_WARNING_DURATION if self.horizontal else self.WARNING_DURATION
-        active_dur = self.H_ACTIVE_DURATION  if self.horizontal else self.ACTIVE_DURATION
+        warn_dur   = self.warning_duration
+        active_dur = self.active_duration
 
         if self.state == "warning":
             if self.sound:
@@ -286,7 +288,7 @@ class Laser:
 
             beam_rect = self._get_beam_rect()
             if beam_rect.colliderect(p1.get_rect()):
-                p1.hp -= self.DAMAGE
+                p1.hp -= self.dam
                 if p1.hp > 0:
                     play_sound("player hit")
 
@@ -297,11 +299,11 @@ class Laser:
 
     def _get_beam_rect(self):
         if self.horizontal:
-            return pygame.Rect(0, self.world_y - self.BEAM_WIDTH // 2,
-                               map_width, self.BEAM_WIDTH)
+            return pygame.Rect(0, self.world_y - self.width // 2,
+                               map_width, self.width)
 
         if self.angle == 90:
-            return pygame.Rect(self.x - self.BEAM_WIDTH // 2, 0, self.BEAM_WIDTH, map_height)
+            return pygame.Rect(self.x - self.width // 2, 0, self.width, map_height)
 
         rad = math.radians(self.angle)
         x_span = map_height / math.tan(rad) if math.tan(rad) != 0 else 0
@@ -336,14 +338,14 @@ class Laser:
                 color = (255, int(80 + 120 * pulse), 0)
                 pygame.draw.line(surface, color,
                                  (0, screen_y), (WIDTH, screen_y),
-                                 int(self.BEAM_WIDTH / 2))
+                                 int(self.width / 2))
             elif self.state == "active":
                 pygame.draw.line(surface, (255, 200, 200),
                                  (0, screen_y), (WIDTH, screen_y),
-                                 self.BEAM_WIDTH + 8)
+                                 self.width + 8)
                 pygame.draw.line(surface, (255, 50, 50),
                                  (0, screen_y), (WIDTH, screen_y),
-                                 self.BEAM_WIDTH)
+                                 self.width)
             return
 
         top_pt, bot_pt = self._get_screen_endpoints(camera)
@@ -351,66 +353,63 @@ class Laser:
         if self.state == "warning":
             pulse = 0.5 + 0.5 * math.sin(self.timer * 10)
             color = (255, int(80 + 120 * pulse), 0)
-            pygame.draw.line(surface, color, top_pt, bot_pt, int(self.BEAM_WIDTH / 2))
+            pygame.draw.line(surface, color, top_pt, bot_pt, int(self.width / 2))
             pygame.draw.rect(surface, color,
                              pygame.Rect(bot_pt[0] - 6, HEIGHT - 16, 12, 16))
 
         elif self.state == "active":
-            pygame.draw.line(surface, (255, 200, 200), top_pt, bot_pt, self.BEAM_WIDTH + 8)
-            pygame.draw.line(surface, (255, 50, 50),   top_pt, bot_pt, self.BEAM_WIDTH)
+            pygame.draw.line(surface, (255, 200, 200), top_pt, bot_pt, self.width + 8)
+            pygame.draw.line(surface, (255, 50, 50),   top_pt, bot_pt, self.width)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # EYE LASER CLASS
 # ─────────────────────────────────────────────────────────────────────────────
 class EyeLaser:
-    WARNING_DURATION = 0.4
-    ACTIVE_DURATION  = 0.7
-    BEAM_WIDTH       = 20
-    DAMAGE           = 2
-
-    def __init__(self, origin_x, origin_y, target_x, target_y, sound=True):
+    def __init__(self, origin_x, origin_y, sound=True, warning_duration = 1, active_duration = 1):
         self.ox    = origin_x
         self.oy    = origin_y
-        dx = target_x - origin_x
-        dy = target_y - origin_y
-        dist = math.sqrt(dx*dx + dy*dy) or 1
-        self.dx = dx / dist
-        self.dy = dy / dist
+
         self.sound = sound
         self.timer = 0.0
         self.state = "warning"
 
-    def _endpoint(self):
-        far = max(map_width, map_height) * 2
-        return self.ox + self.dx * far, self.oy + self.dy * far
+        self.warning_duration = warning_duration
+        self.active_duration = active_duration
+        self.damage = 1
+        self.width = 20
+
+        self.target = p1.get_rect()
+
+        self.target_x, self.target_y = self.target.centerx, self.target.centery
+
+
 
     def _get_beam_rect(self):
-        ex, ey = self._endpoint()
-        x_min = min(self.ox, ex)
-        y_min = min(self.oy, ey)
-        x_max = max(self.ox, ex)
-        y_max = max(self.oy, ey)
-        return pygame.Rect(x_min - self.BEAM_WIDTH, y_min - self.BEAM_WIDTH,
-                           (x_max - x_min) + self.BEAM_WIDTH * 2,
-                           (y_max - y_min) + self.BEAM_WIDTH * 2)
+        x_min = min(self.ox, self.target_x)
+        y_min = min(self.oy, self.target_y)
+        x_max = max(self.ox, self.target_x)
+        y_max = max(self.oy, self.target_y)
+        return pygame.Rect(x_min - self.width, y_min - self.width,
+                           (x_max - x_min) + self.width * 2,
+                           (y_max - y_min) + self.width * 2)
 
     def update(self, dt):
         self.timer += dt
         if self.state == "warning":
             if self.sound:
                 laser_charge_s.play()
-            if self.timer >= self.WARNING_DURATION:
+            if self.timer >= self.warning_duration:
                 laser_charge_s.stop()
                 self.state = "active"
                 self.timer = 0.0
         elif self.state == "active":
             if self.sound:
                 laser_sound.play()
-            if p1.get_rect().clipline((self.ox, self.oy), self._endpoint()):
-                p1.hp -= self.DAMAGE
+            if p1.get_rect().clipline((self.ox, self.oy), (self.target_x, self.target_y)):
+                p1.hp -= self.damage
                 if p1.hp > 0:
                     play_sound("player hit")
-            if self.timer >= self.ACTIVE_DURATION:
+            if self.timer >= self.active_duration:
                 if self.sound:
                     laser_sound.stop()
                 self.state = "done"
@@ -418,16 +417,92 @@ class EyeLaser:
     def draw(self, surface, camera):
         sx  = int(self.ox - camera.x)
         sy  = int(self.oy - camera.y)
-        ex, ey = self._endpoint()
-        ex2 = int(ex - camera.x)
-        ey2 = int(ey - camera.y)
+        ex2 = int(self.target_x - camera.x)
+        ey2 = int(self.target_y - camera.y)
+
+        # Extend the visual line past the target so it looks like it pierces through
+        dx = ex2 - sx
+        dy = ey2 - sy
+        dist = math.sqrt(dx**2 + dy**2) or 1
+        ex2 = int(sx + (dx / dist) * 2000)
+        ey2 = int(sy + (dy / dist) * 2000)
+
         if self.state == "warning":
             pulse = 0.5 + 0.5 * math.sin(self.timer * 12)
             color = (255, int(50 + 150 * pulse), int(200 * pulse))
-            pygame.draw.line(surface, color, (sx, sy), (ex2, ey2), max(2, self.BEAM_WIDTH // 3))
+            pygame.draw.line(surface, color, (sx, sy), (ex2, ey2), max(2, self.width // 3))
         elif self.state == "active":
-            pygame.draw.line(surface, (255, 200, 200), (sx, sy), (ex2, ey2), self.BEAM_WIDTH + 6)
-            pygame.draw.line(surface, (255, 50, 200),  (sx, sy), (ex2, ey2), self.BEAM_WIDTH)
+            pygame.draw.line(surface, (255, 200, 200), (sx, sy), (ex2, ey2), self.width + 6)
+            pygame.draw.line(surface, (255, 50, 200),  (sx, sy), (ex2, ey2), self.width)
+
+class Spear:
+    def __init__(self, x, count=1):
+        # Spawns at the top of the screen in world coords
+        self.x = x
+        self.world_y = camera.y  # top of current view
+        self.vy = -200           # launch upward first
+        self.phase = "up"        # "up" → "down"
+        self.up_timer = .5      # how long it travels upward before falling
+        self.timer = 0.0
+        self.width = 10
+        self.height = 40
+        self.done = False
+        self.color = WHITE
+        self.damage = 20
+        self.hit = False
+        self.speed_down = 500    # pixels per second falling
+
+    def get_rect(self):
+        return pygame.Rect(
+            self.x - self.width // 2-2,
+            int(self.world_y) - self.height // 2 - 200,
+            self.width,
+            self.height+400
+        )
+
+    def update(self, dt):
+        self.timer += dt
+
+        if self.phase == "up":
+            self.world_y += self.vy * dt
+            if self.timer >= self.up_timer:
+                self.phase = "down"
+                self.vy = self.speed_down
+                self.timer = 0.0
+
+        elif self.phase == "down":
+            self.world_y += self.vy * dt
+
+            # Damage player — only if they have no knockback active
+            if abs(p1.kb_x) <= 0 and abs(p1.kb_y) <= 0 and not self.hit:
+                if self.get_rect().colliderect(p1.get_rect()):
+                    p1.hp -= self.damage
+                    if p1.hp > 0:
+                        play_sound("player hit")
+                    # Apply knockback
+                    p1.kb_x = p1.knockback_x if p1.x < self.x else -p1.knockback_x
+                    p1.kb_y = -p1.knockback_y
+                    self.hit = True
+                    p1.hit = True
+                    p1.last_hit = 0
+
+            self.vy*=1.02
+
+            # Disappear when off screen (below camera view)
+            if self.world_y > camera.y + HEIGHT + 100:
+                self.done = True
+
+    def draw(self, surface, camera):
+        global boss_spear
+        sx = int(self.x - camera.x)
+        sy = int(self.world_y - camera.y)
+        rect = boss_spear.get_rect(center=(sx, sy))
+        if self.phase == "up":
+                white_spear = boss_spear.copy()
+                white_spear.fill(self.color, special_flags=pygame.BLEND_RGB_MAX)
+                surface.blit(white_spear, rect.topleft)
+        else:
+            surface.blit(boss_spear, rect.topleft)
 
 class Player:
     def __init__(self):
@@ -687,7 +762,8 @@ class Enemy:
 
         else:
             self.phase = 1
-            self.max_hp = 10
+            #enemy max hp
+            self.max_hp = 20
             self.hp = self.max_hp
             self.dam = 20
             frames = [range(BOSS_FRAMES)]
@@ -715,14 +791,13 @@ class Enemy:
             # World y = TILE = 64px (map row 1 — one tile from the very top of map2)
             self.p3_wall_rows          = []
             self.p3_wall_timer         = 0.0
-            self.p3_wall_interval      = 0.8
+            self.p3_wall_interval      = 0.1
             self.p3_combat_timer       = 0.0
-            self.p3_combat_interval    = .5
-            self.p3_attack_index       = 0
+            self.p3_combat_interval    = .75
             self.p3_eye_laser          = None
             self.p3_target_laser       = None
             self.p3_teleport_timer     = 0.0
-            self.p3_teleport_interval  = 3.5
+            self.p3_teleport_interval  = 1.5
 
     def take_hit(self, damage):
         if self.p3_state != "p3_retreat":
@@ -741,6 +816,9 @@ class Enemy:
             elif not self.is_Boss or self.p3_state != "p3_retreat":
                 p1.score += 1
                 play_sound("die")
+                if self.is_Boss:
+                    lasers.clear()
+                    eye_lasers.clear()
             elif  self.is_Boss and not self.phase3_entered:
                 play_sound("die")
             self.hit = True
@@ -763,9 +841,20 @@ class Enemy:
             world_x = int(map_width * i / (num_lasers + 1))
             lasers.append(Laser(world_x+offset, angle=90, warning=True, permanent=False, sound=True))
 
+    def _spawn_spears(self, count=8):
+        """Spawn `count` spears spread across the visible screen width."""
+        global spears
+        padding = 80  # keep spears away from screen edges
+        for i in range(count):
+            # Spread evenly with a little random jitter
+            base_x = camera.x + padding + (WIDTH - padding * 2) * i / max(count - 1, 1)
+            jitter = random.randint(-40, 40)
+            wx = int(base_x + jitter)
+            spears.append(Spear(wx))
+
     def _p3_spawn_rain_batch(self):
         global lasers
-        lasers = [l for l in lasers if l.state != "done"]
+        lasers = [l for l in lasers if l.state != "done" or l.permanent]
         num = 12
         offset = random.randint(-80, 80)
         for i in range(1, num + 1):
@@ -781,7 +870,7 @@ class Enemy:
     def _p3_fire_eye_laser(self):
         eye_x = self.x + P3W // 2
         eye_y = self.y + P3H // 2
-        self.p3_eye_laser = EyeLaser(eye_x, eye_y, p1.x - BW//2, p1.y - BH//2)
+        self.p3_eye_laser = EyeLaser(eye_x, eye_y)
         eye_lasers.append(self.p3_eye_laser)
 
     def _p3_fire_targeted_laser(self):
@@ -791,7 +880,7 @@ class Enemy:
                       warning=True, permanent=False, sound=True)
         else:
             l = Laser(0, horizontal=True, world_y=p1.y + (BH * SCALE) // 2,
-                      warning=True, permanent=False, sound=False)
+                      warning=True, permanent=False, sound=True)
         lasers.append(l)
         self.p3_target_laser = l
 
@@ -914,8 +1003,10 @@ class Enemy:
                     self.y += (dy / dist) * speed * dt
 
                     if dist < 25:
+                        global BG
                         grid, tile_rects, map_height, map_width = get_grid("map2.tile")
                         camera.shake(1.5,15,15)
+                        BG = phase_3_bg
                         self.p3_state = "p3_rain"
                         self.p3_rain_timer = 0.0
                         lasers.clear()
@@ -949,19 +1040,10 @@ class Enemy:
                         row = self.p3_wall_rows.pop(0)
                         self._p3_spawn_wall_laser(row)
 
-                    # All rows spawned — wait until all wall lasers are active (not just warning),
-                    # then enter combat. Do NOT clear lasers; permanent walls stay up forever.
                     if not self.p3_wall_rows:
-                        walls_active = all(
-                            l.state == "active"
-                            for l in lasers
-                            if getattr(l, 'horizontal', False)
-                        )
-                        if walls_active:
-                            self.p3_state        = "p3_combat"
-                            self.p3_combat_timer  = self.p3_combat_interval
-                            self.p3_attack_index  = 0
-                            self.p3_teleport_timer = self.p3_teleport_interval
+                        self.p3_state          = "p3_combat"
+                        self.p3_combat_timer   = self.p3_combat_interval
+                        self.p3_teleport_timer = self.p3_teleport_interval
 
                 elif self.p3 == "p3_combat":
                     self.p3_teleport_timer -= dt
@@ -971,17 +1053,31 @@ class Enemy:
 
                     self.p3_combat_timer -= dt
                     if self.p3_combat_timer <= 0:
-                        if self.p3_attack_index % 2 == 0:
+                        self.attack = random.randint(1,3)
+                        if self.attack == 1:
                             self._p3_fire_eye_laser()
                             self.p3_state = "p3_eye_fire"
+                        elif self.attack == 2:
+                            self._spawn_spears()
+                            self.p3_state = "p3_spear_fire"
                         else:
                             self._p3_fire_targeted_laser()
                             self.p3_state = "p3_targeted"
-                        self.p3_attack_index += 1
 
                 elif self.p3 == "p3_eye_fire":
                     if self.p3_eye_laser and self.p3_eye_laser.state == "done":
                         self.p3_eye_laser = None
+                        self.p3_state        = "p3_combat"
+                        self.p3_combat_timer = self.p3_combat_interval
+
+                elif self.p3 == "p3_spear_fire":
+                    global spears
+                    spears_done = True
+                    for s in spears:
+                        if not s.done:
+                            spears_done = False
+                    if spears_done:
+                        spears = []
                         self.p3_state        = "p3_combat"
                         self.p3_combat_timer = self.p3_combat_interval
 
@@ -1127,10 +1223,10 @@ class Upgrade:
 
         if self.spawn_timer >0:
             self.spawn_timer -= dt
-        elif self.x == 0 and self.y == 0:
+        elif self.x == 0 and self.y == 0 and enemies[-1].p3_state != "p3_retreat":
             spawn_text("medkit", spawn_font, GREEN)
             self.spawn(grid)
-        elif enemies[-1].phase == 3 and self.y > 800:
+        elif enemies[-1].phase == 3 and self.y > 800 and enemies[-1].p3_state != "p3_retreat":
             spawn_text("medkit", spawn_font, GREEN)
             self.spawn(grid)
 
@@ -1152,7 +1248,8 @@ class Upgrade:
             coordinate_y = random.randint(1,len(grid)-1)
             coordinate_x = random.randint(0, len(grid[coordinate_y])-1)
             if grid[coordinate_y][coordinate_x] == 0 and grid[coordinate_y+1][coordinate_x] != 0:
-                if not enemies[-1].phase == 3 or coordinate_y * 64 < 800: found = True
+                if enemies[-1].phase != 3 or (coordinate_y * 64 < 800): 
+                    found = True
         self.x = coordinate_x*TILE + 5
         self.y = coordinate_y*TILE
 
@@ -1318,11 +1415,15 @@ while running:
         if enemies[-1].hp > 0:
             for l in lasers:
                 l.update(dt)
-            lasers[:] = [l for l in lasers if l.state != "done"]
+            lasers[:] = [l for l in lasers if l.state != "done" or l.permanent]
 
             for el in eye_lasers:
                 el.update(dt)
             eye_lasers[:] = [el for el in eye_lasers if el.state != "done"]
+
+            for s in spears:
+                s.update(dt)
+            spears[:] = [s for s in spears if not s.done]
 
         if p1.last_hit >= .5:
             p1.hit = False
@@ -1368,6 +1469,11 @@ while running:
             if wave_num > 5:
                 in_Game = False
                 win = True
+                lasers.clear()
+                eye_lasers.clear()
+                spears.clear()
+                laser_charge_s.stop()
+                laser_sound.stop()
             else:
                 enemies = spawn_wave(enemies, wave_num)
 
@@ -1379,7 +1485,7 @@ while running:
         p1.tot_speed = math.sqrt(p1.speed_x**2 + p1.speed_y**2)
         p1.max_speed = max(p1.max_speed, p1.tot_speed)
 
-    elif not dead or win:
+    elif not dead and not win:
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 p1.handle_event(event)        
@@ -1390,7 +1496,10 @@ while running:
 
         screen.fill(SKY)
 
-        screen.blit(BG, (0-camera.x*.5,-250-camera.y*.5))
+        if BG != phase_3_bg:
+            screen.blit(BG, (0-camera.x*.5,-250-camera.y*.5))
+        else:
+            screen.blit(BG, (0-camera.x*.5,-350-camera.y*.5))
 
         for e in enemies:
             if e.hp > 0 and e.phase == 3:
@@ -1423,6 +1532,11 @@ while running:
 
         for l in lasers:
             l.draw(screen, camera)
+
+        for s in spears:
+            s.draw(screen, camera)
+            if hitboxes:
+                pygame.draw.rect(screen, RED, s.get_rect().move(-camera.x, -camera.y), 2)
 
         for el in eye_lasers:
             el.draw(screen, camera)
@@ -1515,6 +1629,8 @@ while running:
     
     if p1.hp <=0 and not dead:
         play_sound('player die')
+        laser_charge_s.stop()
+        laser_sound.stop()
         in_Game = False
         dead = True
 
