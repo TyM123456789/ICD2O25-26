@@ -33,6 +33,20 @@ boss_sheet = pygame.image.load("the REAL RELA eye 1.png").convert_alpha()
 # phase 3 boss sprite — single image, no frames
 phase3_img_raw = pygame.image.load("phase3.png").convert_alpha()
 
+#spear
+boss_spear = pygame.transform.rotate(
+    pygame.transform.scale(pygame.image.load("the actual spear of long sigma.png"), (280,280)),
+    225)
+
+rect = boss_spear.get_bounding_rect()
+trimmed = pygame.Surface(rect.size, pygame.SRCALPHA)
+trimmed.blit(boss_spear, (0, 0), rect)
+boss_spear = trimmed
+white_spear = boss_spear.copy()
+white_spear.fill((255,255,255), special_flags=pygame.BLEND_RGB_MAX)
+
+
+
 SCALE = 2
 
 BODY_FRAMES = 10
@@ -57,6 +71,9 @@ phase3_img = pygame.transform.scale(phase3_img_raw,
 phase3_img_flipped = pygame.transform.flip(phase3_img, True, False)
 P3W = phase3_img.get_width()
 P3H = phase3_img.get_height()
+
+SPEARW = boss_spear.get_width()
+SPEARH = boss_spear.get_height()
 
 #colors
 WHITE = (255,255,255)
@@ -94,9 +111,6 @@ medkit_frames = [pygame.transform.scale(medkit_sheet.subsurface((i*MW,0,MW,MH)),
 boss_frames = [pygame.transform.scale(boss_sheet.subsurface((i*BOSSW,0,BOSSW,BOSSH)), (BOSSW*SCALE*1.5,BOSSH*SCALE*1.5)) for i in range(BOSS_FRAMES)]
 boss_frames = [pygame.transform.flip(f, True, False) for f in boss_frames]
 
-boss_spear = pygame.transform.rotate(
-    pygame.transform.scale(pygame.image.load("spear of long sigma.png"), (280,280)),
-    225)
 #flipped frames
 body_frames_flipped = [pygame.transform.flip(f, True, False) for f in body_frames]
 arms_frames_flipped = [pygame.transform.flip(f, True, False) for f in arms_frames]
@@ -113,14 +127,8 @@ GROUND = (44 - 1) * TILE - (BH * SCALE) #sixteen is the place on the ground, -1 
 normal_bg = pygame.transform.scale(pygame.image.load("backgroundv.2.png"), (800*4, 600*4))
 phase_3_bg = pygame.transform.scale(pygame.image.load("background but seig.png"), (800*4, 600*4))
 
-tiles = [
-    "",
-    pygame.transform.scale(pygame.image.load("blue dark tile.png"), (TILE, TILE)),
-    pygame.transform.scale(pygame.image.load("blue light tile.png"), (TILE, TILE))
-]
-
 def start_game():
-    global p1, lasers, eye_lasers, spears, grid, tile_rects, map_height, map_width, BG
+    global p1, lasers, eye_lasers, spears, grid, tile_rects, map_height, map_width, BG, tiles
     global wave_num, wave_timer, enemies, upgrades, camera, time, hitboxes
     global dead, win, paused, in_Game, start_Screen, menu_state, Spawn_text, spawn_text_timer
     global just_Started, start_screen_frame, picture_frame_time
@@ -131,9 +139,14 @@ def start_game():
     spears = []
 
     BG = normal_bg
+    tiles = [
+        "",
+        pygame.transform.scale(pygame.image.load("blue dark tile.png"), (TILE, TILE)),
+        pygame.transform.scale(pygame.image.load("blue light tile.png"), (TILE, TILE))
+    ]
 
     grid, tile_rects, map_height, map_width = get_grid("map.tile")
-    wave_num = 5
+    wave_num = 1
     wave_timer = -1
     enemies = spawn_wave([], wave_num)
     upgrades = [Upgrade("medkit", 5)]
@@ -169,7 +182,6 @@ def get_grid(map):
 def draw_tiles(grid, camera):
     x=0
     y=0
-    camera_rect = camera.get_rect()
     for row_i, row in enumerate(grid): 
         y=-camera.y
         for col_i, tile in enumerate(row):
@@ -445,19 +457,18 @@ class Spear:
         self.up_timer = .5      # how long it travels upward before falling
         self.timer = 0.0
         self.width = 10
-        self.height = 40
+        self.height = 370
         self.done = False
-        self.color = WHITE
         self.damage = 20
         self.hit = False
         self.speed_down = 500    # pixels per second falling
 
     def get_rect(self):
         return pygame.Rect(
-            self.x - self.width // 2-2,
+            self.x - self.width // 2+2,
             int(self.world_y) - self.height // 2 - 200,
             self.width,
-            self.height+400
+            self.height
         )
 
     def update(self, dt):
@@ -489,23 +500,17 @@ class Spear:
                     p1.hit = True
                     p1.last_hit = 0
 
-            self.vy*=1.02
+
 
             # Disappear when off screen (below camera view)
             if self.world_y > camera.y + HEIGHT + 100:
                 self.done = True
 
     def draw(self, surface, camera):
-        global boss_spear
-        sx = int(self.x - camera.x)
-        sy = int(self.world_y - camera.y)
-        rect = boss_spear.get_rect(center=(sx, sy))
-        if self.phase == "up":
-                white_spear = boss_spear.copy()
-                white_spear.fill(self.color, special_flags=pygame.BLEND_RGB_MAX)
-                surface.blit(white_spear, rect.topleft)
-        else:
-            surface.blit(boss_spear, rect.topleft)
+        img = white_spear if self.phase == "up" else boss_spear
+        draw_x = self.x - SPEARW // 2 - camera.x
+        draw_y = int(self.world_y) - SPEARW // 2 - camera.y-200
+        surface.blit(img, (draw_x, draw_y))
 
 class Player:
     def __init__(self):
@@ -766,7 +771,7 @@ class Enemy:
         else:
             self.phase = 1
             #enemy max hp
-            self.max_hp = 10
+            self.max_hp = 400
             self.hp = self.max_hp
             self.dam = 20
             frames = [range(BOSS_FRAMES)]
@@ -1006,9 +1011,14 @@ class Enemy:
                     self.y += (dy / dist) * speed * dt
 
                     if dist < 25:
-                        global BG
+                        global BG, tiles
                         grid, tile_rects, map_height, map_width = get_grid("map2.tile")
                         camera.shake(1.5,15,15)
+                        tiles = [
+                                "",
+                                pygame.transform.scale(pygame.image.load("blue dark tile.png"), (TILE, TILE)),
+                                pygame.transform.scale(pygame.image.load("blue light tile.png"), (TILE, TILE))
+                            ]
                         BG = phase_3_bg
                         self.p3_state = "p3_rain"
                         self.p3_rain_timer = 0.0
@@ -1056,11 +1066,11 @@ class Enemy:
 
                     self.p3_combat_timer -= dt
                     if self.p3_combat_timer <= 0:
-                        self.attack = random.randint(1,3)
+                        self.attack = random.randint(1,4)
                         if self.attack == 1:
                             self._p3_fire_eye_laser()
                             self.p3_state = "p3_eye_fire"
-                        elif self.attack == 2:
+                        elif self.attack == 2 or self.attack == 3:
                             self._spawn_spears()
                             self.p3_state = "p3_spear_fire"
                         else:
@@ -1294,11 +1304,8 @@ class Camera:
         self.x += self.shake_dist_x
         self.y += self.shake_dist_y
 
-    def shake (self, length, intensity_x, intensity_y): self.shake_time, self.intensity_x, self.intensity_y = length, intensity_x, intensity_y
-
-    def get_rect(self):
-        global WIDTH, HEIGHT
-        return pygame.Rect(self.x, self.y, (WIDTH), (HEIGHT))
+    def shake (self, length, intensity_x, intensity_y): 
+        self.shake_time, self.intensity_x, self.intensity_y = length, intensity_x, intensity_y
     
 # --- Game loop ---
 running = True
@@ -1391,7 +1398,13 @@ while running:
         pygame.draw.rect(screen, GRAY, TITLE)
         text_to_screen("EYE SEE YOU", title_font, BLACK, TITLE.x+20, TITLE.y+30)
 
-        pygame.draw.ellipse(screen,BLACK, (610,92,20,60))
+        dist_from_mouse_x = mouse_x - 610
+        dist_from_mouse_y = mouse_y - 92
+
+        offset_x = dist_from_mouse_x//120
+        offset_y = dist_from_mouse_y//100
+
+        pygame.draw.ellipse(screen,BLACK, (610+offset_x,92+offset_y,20,60))
 
     elif in_Game:
         past_x = p1.x
@@ -1465,12 +1478,12 @@ while running:
 
         if len(enemies) == p1.score and wave_timer == -1:
             wave_timer = 5
-            if wave_num == 5:
-                lasers.clear()
-                eye_lasers.clear()
-                spears.clear()
-                laser_charge_s.stop()
-                laser_sound.stop()
+
+            lasers.clear()
+            eye_lasers.clear()
+            spears.clear()
+            laser_charge_s.stop()
+            laser_sound.stop()
         elif len(enemies) == p1.score and wave_timer > 0:
             wave_timer -=dt
         if wave_timer <=0 and len(enemies) == p1.score:
